@@ -37,14 +37,35 @@ builder.Services.AddSwaggerGen(c =>
         Format = "binary"
     });
 
-    // Definició API Key (botó Authorize existirà, però no ens hi refiem per injectar headers)
-    c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    // Swagger · API Keys (només documentació/UI; NO aplica auth real)
+    c.AddSecurityDefinition("AdminApiKey", new OpenApiSecurityScheme
     {
-        Description = "Introdueix la clau d'admin (header X-Api-Key).",
-        Name = "X-Api-Key",
+        Description = "Admin API Key (header AdminApiKey).",
+        Name = "AdminApiKey",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey
     });
+
+    c.AddSecurityDefinition("ProfileApiKey", new OpenApiSecurityScheme
+    {
+        Description = "Profile API Key (header ProfileApiKey).",
+        Name = "ProfileApiKey",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey
+    });
+
+    // Header només als endpoints que toca (no global)
+    c.OperationFilter<AddPerEndpointApiKeyHeaderParameter>();
+
+
+    //// Definició API Key (botó Authorize existirà, però no ens hi refiem per injectar headers)
+    //c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    //{
+    //    Description = "Introdueix la clau d'admin (header X-Api-Key).",
+    //    Name = "X-Api-Key",
+    //    In = ParameterLocation.Header,
+    //    Type = SecuritySchemeType.ApiKey
+    //});
 
     // En lloc de SecurityRequirement (que et porta a conflictes), afegim header param a totes les operacions
     //c.OperationFilter<AddApiKeyHeaderParameter>();
@@ -139,35 +160,101 @@ app.Run();
 // ──────────────────────────────────────────────────────────────
 // OperationFilter compatible amb Microsoft.OpenApi (IOpenApiParameter + JsonSchemaType)
 // ──────────────────────────────────────────────────────────────
-public sealed class AddApiKeyHeaderParameter : IOperationFilter
-{
-    public void Apply(OpenApiOperation operation, OperationFilterContext context)
-    {
-        // En aquest model: IList<IOpenApiParameter>
-        if (operation.Parameters == null)
-            operation.Parameters = new List<IOpenApiParameter>();
+//public sealed class AddApiKeyHeaderParameter : IOperationFilter
+//{
+//    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+//    {
+//        // En aquest model: IList<IOpenApiParameter>
+//        if (operation.Parameters == null)
+//            operation.Parameters = new List<IOpenApiParameter>();
 
-        // Evita duplicats
-        foreach (var p in operation.Parameters)
+//        // Evita duplicats
+//        foreach (var p in operation.Parameters)
+//        {
+//            if (string.Equals(p.Name, "X-Api-Key", StringComparison.OrdinalIgnoreCase) &&
+//                p.In == ParameterLocation.Header)
+//            {
+//                return;
+//            }
+//        }
+
+//        operation.Parameters.Add(new OpenApiParameter
+//        {
+//            Name = "X-Api-Key",
+//            In = ParameterLocation.Header,
+//            Required = false,
+//            Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+//            Description = "Clau d'admin per endpoints protegits"
+//        });
+//    }
+//}
+
+    class AddPerEndpointApiKeyHeaderParameter : IOperationFilter
+    {
+        public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
-            if (string.Equals(p.Name, "X-Api-Key", StringComparison.OrdinalIgnoreCase) &&
-                p.In == ParameterLocation.Header)
+            if (operation.Parameters == null)
+                operation.Parameters = new List<IOpenApiParameter>();
+
+            // Detecta controller (forma estàndard a ASP.NET Core)
+            var ctrl =
+                context.ApiDescription.ActionDescriptor.RouteValues.TryGetValue("controller", out var c)
+                    ? c
+                    : null;
+
+            if (string.IsNullOrWhiteSpace(ctrl))
+                return;
+
+            // Admin endpoints (Admin:ApiKey)
+            if (IsAdminController(ctrl))
             {
+                AddHeaderIfMissing(operation, "AdminApiKey", "Admin API Key per endpoints admin (temporalment també pot existir X-Api-Key al backend).");
+                return;
+            }
+
+            // Profile endpoints (ApiKeyProfiles)
+            if (IsProfileController(ctrl))
+            {
+                AddHeaderIfMissing(operation, "ProfileApiKey", "Profile API Key per endpoints de perfil (temporalment també pot existir X-Api-Key al backend).");
                 return;
             }
         }
 
-        operation.Parameters.Add(new OpenApiParameter
+        private static bool IsAdminController(string controllerName)
         {
-            Name = "X-Api-Key",
-            In = ParameterLocation.Header,
-            Required = false,
-            Schema = new OpenApiSchema { Type = JsonSchemaType.String },
-            Description = "Clau d'admin per endpoints protegits"
-        });
-    }
-}
+            // Controllers que al teu dump van amb Admin:ApiKey
+            // QRController, QrMultiAdminController, QrResolveController, ClientsSelfController
+            return controllerName.Equals("QR", StringComparison.OrdinalIgnoreCase)
+                || controllerName.Equals("QrMultiAdmin", StringComparison.OrdinalIgnoreCase)
+                || controllerName.Equals("QrResolve", StringComparison.OrdinalIgnoreCase)
+                || controllerName.Equals("ClientsSelf", StringComparison.OrdinalIgnoreCase);
+        }
 
+        private static bool IsProfileController(string controllerName)
+        {
+            // Controller que al teu dump va amb ApiKeyProfiles
+            return controllerName.Equals("SapChangeRequestsUdo", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void AddHeaderIfMissing(OpenApiOperation operation, string headerName, string description)
+        {
+            foreach (var p in operation.Parameters)
+            {
+                if (string.Equals(p.Name, headerName, StringComparison.OrdinalIgnoreCase) &&
+                    p.In == ParameterLocation.Header)
+                    return;
+            }
+
+            operation.Parameters.Add(new OpenApiParameter
+            {
+                Name = headerName,
+                In = ParameterLocation.Header,
+                Required = true,
+                Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+                Description = description
+            });
+        }
+    }
 
 
 
