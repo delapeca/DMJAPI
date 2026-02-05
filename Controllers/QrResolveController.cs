@@ -152,12 +152,13 @@ namespace XNDmjApi.Controllers
             // Accepta X-Api-Key (Swagger) i X-API-Key (AR), mateix valor
             string? provided = null;
 
-            if (Request.Headers.TryGetValue("X-Api-Key", out var apiKeyVal))
+            if (Request.Headers.TryGetValue("AdminApiKey", out var adminVal))
+                provided = adminVal.ToString().Trim();
+            else if (Request.Headers.TryGetValue("X-Api-Key", out var apiKeyVal))
                 provided = apiKeyVal.ToString().Trim();
             else if (Request.Headers.TryGetValue("X-API-Key", out var showroomVal))
                 provided = showroomVal.ToString().Trim();
-
-            if (string.IsNullOrWhiteSpace(provided))
+if (string.IsNullOrWhiteSpace(provided))
             {
                 fail = Unauthorized(new { error = "UNAUTHORIZED" });
                 return false;
@@ -173,3 +174,4 @@ namespace XNDmjApi.Controllers
         }
     }
 }
+

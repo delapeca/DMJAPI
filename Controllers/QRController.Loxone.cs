@@ -149,7 +149,8 @@ namespace XNDmjApi.Controllers
                 return false;
             }
 
-            var header = Request.Headers["X-Api-Key"].FirstOrDefault()
+            var header = Request.Headers["AdminApiKey"].FirstOrDefault()
+                    ?? Request.Headers["X-Api-Key"].FirstOrDefault()
                     ?? Request.Headers["X-API-Key"].FirstOrDefault()
                     ?? Request.Headers["x-api-key"].FirstOrDefault();
 
@@ -727,5 +728,6 @@ namespace XNDmjApi.Controllers
         }
     }
 }
+
 
 

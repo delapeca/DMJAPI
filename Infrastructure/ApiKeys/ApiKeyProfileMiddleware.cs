@@ -44,16 +44,20 @@ namespace XNDmjApi.Infrastructure.ApiKeys
                 return;
             }
 
-            // Header required
-            if (!ctx.Request.Headers.TryGetValue("X-Api-Key", out var hv))
+            // Header required (ProfileApiKey preferent; fallback temporal X-Api-Key)
+            string incoming = "";
+            if (ctx.Request.Headers.TryGetValue("ProfileApiKey", out var hvNew))
+                incoming = (hvNew.ToString() ?? "").Trim();
+            else if (ctx.Request.Headers.TryGetValue("X-Api-Key", out var hvOld))
+                incoming = (hvOld.ToString() ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(incoming))
             {
                 ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await ctx.Response.WriteAsJsonAsync(new { ok = false, code = "MISSING_API_KEY", message = "Falta header X-Api-Key." });
+                await ctx.Response.WriteAsJsonAsync(new { ok = false, code = "MISSING_API_KEY", message = "Falta header ProfileApiKey (o X-Api-Key durant la transició)." });
                 return;
             }
-
-            string incoming = (hv.ToString() ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(incoming))
+if (string.IsNullOrWhiteSpace(incoming))
             {
                 ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 await ctx.Response.WriteAsJsonAsync(new { ok = false, code = "MISSING_API_KEY", message = "X-Api-Key buit." });
@@ -106,3 +110,4 @@ namespace XNDmjApi.Infrastructure.ApiKeys
         }
     }
 }
+

@@ -40,8 +40,8 @@ public ClientsSelfController(IConfiguration cfg)
 
             // 1) Intentem HEADER (tots els noms habituals)
             string key = "";
-            if (Request.Headers.TryGetValue("X-Api-Key", out var h1)) key = h1.ToString();
-            else if (Request.Headers.TryGetValue("X-API-Key", out var h2)) key = h2.ToString();
+            if (Request.Headers.TryGetValue("AdminApiKey", out var ha)) key = ha.ToString();
+            else if (Request.Headers.TryGetValue("X-Api-Key", out var h1)) key = h1.ToString();else if (Request.Headers.TryGetValue("X-API-Key", out var h2)) key = h2.ToString();
             else if (Request.Headers.TryGetValue("x-api-key", out var h3)) key = h3.ToString();
             else if (Request.Headers.TryGetValue("api_key", out var h4)) key = h4.ToString();          // Swagger scheme antic
             else if (Request.Headers.TryGetValue("Api-Key", out var h5)) key = h5.ToString();
@@ -296,6 +296,7 @@ public ClientsSelfController(IConfiguration cfg)
         }
     }
 }
+
 
 
 
