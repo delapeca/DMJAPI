@@ -1,0 +1,1856 @@
+﻿DMJAPI · EnsureSchema DIAG · 20260128_111526
+Root: E:\Programacio\C#\XNApiRest
+
+===== FILE: .\Controllers\DbSetupController.cs =====
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using XNDmjApi.Functions;
+using XNDmjApi.Models;
+using XNDmjApi.Services;
+
+namespace XNDmjApi.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public sealed class DbSetupController : ControllerBase
+    {
+        private readonly SAPLoginService _sapLogin = new SAPLoginService();
+
+        public sealed class EnsureSchemaForm
+        {
+            // Noms EXACTES de multipart/form-data (Swagger + runtime)
+            public string userToken { get; set; } = string.Empty;
+            public string schemaJson { get; set; } = string.Empty;
+        }
+
+        // POST api/DbSetup/EnsureSchema
+        // Nom�s Intranet: requereix userToken SAP i grup Admin/Advanced
+        [HttpPost("EnsureSchema")]
+        [Consumes("multipart/form-data")]
+        public ActionResult EnsureSchema([FromForm] EnsureSchemaForm form, [FromHeader(Name = "X-DMJ-Confirm-Db")] string? confirmDb)
+        {
+            var userToken = form.userToken;
+            var schemaJson = form.schemaJson;
+
+            if (string.IsNullOrWhiteSpace(userToken))
+                return BadRequest(new { ok = false, error = "MISSING_USERTOKEN" });
+
+            if (!_sapLogin.ValidateUserToken(userToken))
+                return BadRequest(new { ok = false, error = "TOKEN_EXPIRED" });
+
+            // IMPORTANT: La DB ve del context SAP (Dades.DOMENJO_BBDD). NO fallback a SBO_DOMENJO.
+            Response.Headers["X-DMJ-DB"] = (Dades.DOMENJO_BBDD ?? "").ToString();
+if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
+                return BadRequest(new { ok = false, error = "DB_CONTEXT_MISSING" });
+
+            if (!_sapLogin.IsAdminOrAdvancedFromToken(userToken))
+                return StatusCode(403, new { ok = false, error = "NOT_AUTHORIZED" });
+
+            if (string.IsNullOrWhiteSpace(schemaJson))
+                return BadRequest(new { ok = false, error = "MISSING_SCHEMAJSON" });
+
+            SqlSchemaSpec? spec;
+            try
+            {
+                spec = JsonConvert.DeserializeObject<SqlSchemaSpec>(schemaJson);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(new { ok = false, error = "BAD_SCHEMAJSON", message = ex.Message });
+            }
+
+            try
+            {
+                var svc = new SqlSchemaService();
+                var resp = svc.Ensure(spec!);
+                return Ok(resp);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(new { ok = false, error = "EXCEPTION", message = ex.Message });
+            }
+        }
+    }
+}
+
+===== FILE: .\Controllers\SapSqlSchemaController.cs =====
+<MISSING: Controllers\SapSqlSchemaController.cs>
+
+===== FILE: .\Models\SqlSchemaSpec.cs =====
+using System.Collections.Generic;
+
+namespace XNDmjApi.Models
+{
+    public sealed class SqlSchemaSpec
+    {
+        public string? Database { get; set; }              // opcional (informatiu)
+        public List<SqlTableSpec> Tables { get; set; } = new();
+    }
+
+    public sealed class SqlTableSpec
+    {
+        public string Schema { get; set; } = "dbo";
+        public string Name { get; set; } = "";
+        public List<SqlColumnSpec> Columns { get; set; } = new();
+        public List<SqlIndexSpec> Indexes { get; set; } = new();
+        public List<SqlForeignKeySpec> ForeignKeys { get; set; } = new();
+    }
+
+    public sealed class SqlColumnSpec
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";            // ex: "int", "nvarchar(50)", "datetime2"
+        public bool Nullable { get; set; } = true;
+        public bool Identity { get; set; } = false;       // només per int/bigint habitualment
+        public bool PrimaryKey { get; set; } = false;     // PK simple (una columna)
+        public string? DefaultSql { get; set; } = null;   // ex: "GETUTCDATE()", "'PENDING'", "0"
+    }
+
+    public sealed class SqlIndexSpec
+    {
+        public string Name { get; set; } = "";
+        public bool Unique { get; set; } = false;
+        public List<string> Columns { get; set; } = new();
+    }
+
+    public sealed class SqlForeignKeySpec
+    {
+        public string Name { get; set; } = "";
+        public string Column { get; set; } = "";
+        public string RefSchema { get; set; } = "dbo";
+        public string RefTable { get; set; } = "";
+        public string RefColumn { get; set; } = "";
+        public bool OnDeleteCascade { get; set; } = false;
+    }
+}
+
+===== FILE: .\Models\DbSetup\DbSetupModels.cs =====
+using System.ComponentModel.DataAnnotations;
+
+namespace XNDmjApi.Models.DbSetup
+{
+    public sealed class EnsureSchemaRequest
+    {
+        /// <summary>userToken SAP (USER_CODE#USERID#expiry) encriptat (AES256_USER_Key)</summary>
+        [Required]
+        public string UserToken { get; set; } = string.Empty;
+
+        /// <summary>Esquema de taules a garantir (idempotent)</summary>
+        [Required]
+        public DbSchema Schema { get; set; } = new DbSchema();
+    }
+
+    public sealed class DbSchema
+    {
+        [Required]
+        public List<DbTableSpec> Tables { get; set; } = new();
+    }
+
+    public sealed class DbTableSpec
+    {
+        /// <summary>Nom de taula (sense schema). Ex: DMJ_CRQ_SQL</summary>
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Opcional. Si vols forçar schema (per defecte: dbo)</summary>
+        public string? Schema { get; set; } = null;
+
+        /// <summary>Columnes</summary>
+        [Required]
+        public List<DbColumnSpec> Columns { get; set; } = new();
+
+        /// <summary>Clau primària (llista de columnes). Si no s'informa, no es crea PK</summary>
+        public List<string>? PrimaryKey { get; set; } = null;
+
+        /// <summary>Índexos (opc.)</summary>
+        public List<DbIndexSpec>? Indexes { get; set; } = null;
+    }
+
+    public sealed class DbColumnSpec
+    {
+        /// <summary>Nom columna</summary>
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Tipus SQL allowlist (ex: int, bigint, bit, datetime2, uniqueidentifier, nvarchar(50), nvarchar(max), decimal(18,2), varbinary(max))
+        /// </summary>
+        [Required]
+        public string SqlType { get; set; } = string.Empty;
+
+        /// <summary>Nullable? (default: true)</summary>
+        public bool Nullable { get; set; } = true;
+
+        /// <summary>IDENTITY(1,1) (només aplicable a int/bigint)</summary>
+        public bool Identity { get; set; } = false;
+
+        /// <summary>Default SQL expression (ex: GETUTCDATE()) - opcional</summary>
+        public string? Default { get; set; } = null;
+    }
+
+    public sealed class DbIndexSpec
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public List<string> Columns { get; set; } = new();
+
+        public bool Unique { get; set; } = false;
+    }
+
+    public sealed class EnsureSchemaResponse
+    {
+        public bool Ok { get; set; }
+        public string Code { get; set; } = "OK";
+        public string Message { get; set; } = "";
+
+        public List<string> CreatedTables { get; set; } = new();
+        public List<string> AddedColumns { get; set; } = new();
+        public List<string> CreatedIndexes { get; set; } = new();
+        public List<string> Notes { get; set; } = new();
+    }
+}
+
+===== FILE: .\Services\SqlSchemaService.cs =====
+using Microsoft.Data.SqlClient;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Text.RegularExpressions;
+using XNDmjApi.Functions;
+using XNDmjApi.Models;
+
+namespace XNDmjApi.Services
+{
+    public sealed class SqlSchemaService
+    {
+        // Allowlist de noms (evitem SQL injection per noms de taula/camp/index/fk)
+        private static readonly Regex SafeName = new Regex("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
+
+        public sealed class EnsureResult
+        {
+            public bool Ok { get; set; }
+            public string Code { get; set; } = "OK";
+            public string Message { get; set; } = "";
+            public List<string> Actions { get; set; } = new();
+        }
+
+        public EnsureResult Ensure(SqlSchemaSpec spec)
+        {
+            if (spec == null || spec.Tables == null || spec.Tables.Count == 0)
+                return new EnsureResult { Ok = false, Code = "MISSING_SCHEMA", Message = "schemaJson sense taules." };
+
+            // ✅ OPCIÓ B: NO fem cap fallback a producció.
+            // Necessitem context de DB establert prèviament via SAPLogin/loginByToken (Dades.DOMENJO_BBDD).
+            if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
+                return new EnsureResult
+                {
+                    Ok = false,
+                    Code = "MISSING_DB_CONTEXT",
+                    Message = "No hi ha DOMENJO_BBDD al context. Fes SAPLogin/loginByToken abans (entorn TEST: XAVDATOS) i torna-ho a provar."
+                };
+
+            // Si la connection string encara no està muntada, la muntem PERÒ amb DOMENJO_BBDD ja definit (sense defaults).
+            if (string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                Dades.SetupDades();
+
+            if (string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                return new EnsureResult
+                {
+                    Ok = false,
+                    Code = "MISSING_CONNECTIONSTRING",
+                    Message = "No hi ha ConnectionStringDOMENJO (després de SetupDades()). Revisa ApplicationSettings i el context de DB."
+                };
+
+            var res = new EnsureResult { Ok = true, Code = "OK", Message = "Schema assegurat." };
+
+            using var con = new SqlConnection(Dades.ConnectionStringDOMENJO);
+            con.Open();
+
+            foreach (var t in spec.Tables)
+            {
+                string schema = string.IsNullOrWhiteSpace(t.Schema) ? "dbo" : t.Schema.Trim();
+                string table  = (t.Name ?? "").Trim();
+
+                ValidateName(schema, "schema");
+                ValidateName(table, "table");
+
+                // 1) Create table si no existeix
+                if (!TableExists(con, schema, table))
+                {
+                    string createSql = BuildCreateTableSql(schema, table, t.Columns);
+                    Exec(con, createSql);
+                    res.Actions.Add($"+ CREATE TABLE [{schema}].[{table}]");
+                }
+
+                // 2) Add columns que faltin
+                foreach (var c in t.Columns ?? new List<SqlColumnSpec>())
+                {
+                    var col = (c.Name ?? "").Trim();
+                    ValidateName(col, "column");
+
+                    if (!ColumnExists(con, schema, table, col))
+                    {
+                        string addColSql = BuildAddColumnSql(schema, table, c);
+                        Exec(con, addColSql);
+                        res.Actions.Add($"+ ALTER TABLE [{schema}].[{table}] ADD [{col}]");
+                    }
+
+                    // PK simple (si es demana i encara no hi és)
+                    if (c.PrimaryKey && !PrimaryKeyExists(con, schema, table))
+                    {
+                        string pkName = $"PK_{table}";
+                        if (!SafeName.IsMatch(pkName)) pkName = $"PK_{table}_1";
+                        string pkSql = $"ALTER TABLE [{schema}].[{table}] ADD CONSTRAINT [{pkName}] PRIMARY KEY ([{col}]);";
+                        Exec(con, pkSql);
+                        res.Actions.Add($"+ PK [{schema}].[{table}] ({col})");
+                    }
+                }
+
+                // 3) Indexes
+                foreach (var ix in t.Indexes ?? new List<SqlIndexSpec>())
+                {
+                    string ixName = (ix.Name ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(ixName)) continue;
+                    ValidateName(ixName, "index");
+
+                    if (!IndexExists(con, schema, table, ixName))
+                    {
+                        var cols = (ix.Columns ?? new List<string>())
+                            .Select(s => s?.Trim())
+                            .Where(s => !string.IsNullOrWhiteSpace(s))
+                            .ToList();
+
+                        if (cols.Count == 0) continue;
+
+                        foreach (var cc in cols) ValidateName(cc!, "index column");
+
+                        string unique = ix.Unique ? "UNIQUE " : "";
+                        string colsSql = string.Join(", ", cols.Select(cn => $"[{cn}]"));
+                        string sql = $"CREATE {unique}INDEX [{ixName}] ON [{schema}].[{table}] ({colsSql});";
+                        Exec(con, sql);
+                        res.Actions.Add($"+ CREATE {(ix.Unique ? "UNIQUE " : "")}INDEX [{ixName}] ON [{schema}].[{table}]");
+                    }
+                }
+
+                // 4) Foreign Keys
+                foreach (var fk in t.ForeignKeys ?? new List<SqlForeignKeySpec>())
+                {
+                    string fkName = (fk.Name ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(fkName)) continue;
+                    ValidateName(fkName, "fk");
+
+                    ValidateName(fk.Column.Trim(), "fk column");
+                    ValidateName(fk.RefSchema.Trim(), "fk ref schema");
+                    ValidateName(fk.RefTable.Trim(), "fk ref table");
+                    ValidateName(fk.RefColumn.Trim(), "fk ref column");
+
+                    if (!ForeignKeyExists(con, schema, table, fkName))
+                    {
+                        string cascade = fk.OnDeleteCascade ? " ON DELETE CASCADE" : "";
+                        string sql = $@"
+                        ALTER TABLE [{schema}].[{table}]
+                        ADD CONSTRAINT [{fkName}]
+                        FOREIGN KEY ([{fk.Column}]) REFERENCES [{fk.RefSchema}].[{fk.RefTable}]([{fk.RefColumn}]){cascade};
+                        ";
+                        Exec(con, sql);
+                        res.Actions.Add($"+ FK [{fkName}] [{schema}].[{table}] -> [{fk.RefSchema}].[{fk.RefTable}]");
+                    }
+                }
+            }
+
+            res.Message = res.Actions.Count == 0 ? "Schema ja estava creat (cap canvi)." : "Schema creat/actualitzat.";
+            return res;
+        }
+
+        private static void ValidateName(string s, string what)
+        {
+            if (string.IsNullOrWhiteSpace(s) || !SafeName.IsMatch(s))
+                throw new Exception($"Nom no segur per {what}: '{s}'. Només [A-Za-z0-9_].");
+        }
+
+        private static void Exec(SqlConnection con, string sql)
+        {
+            using var cmd = new SqlCommand(sql, con);
+            cmd.CommandType = CommandType.Text;
+            cmd.ExecuteNonQuery();
+        }
+
+        private static bool TableExists(SqlConnection con, string schema, string table)
+        {
+            const string sql = @"
+            SELECT 1
+            FROM sys.tables t
+            INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+            WHERE s.name = @schema AND t.name = @table;";
+            using var cmd = new SqlCommand(sql, con);
+            cmd.Parameters.AddWithValue("@schema", schema);
+            cmd.Parameters.AddWithValue("@table", table);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        private static bool ColumnExists(SqlConnection con, string schema, string table, string column)
+        {
+            const string sql = @"
+            SELECT 1
+            FROM sys.columns c
+            INNER JOIN sys.tables t ON t.object_id = c.object_id
+            INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+            WHERE s.name = @schema AND t.name = @table AND c.name = @column;";
+            using var cmd = new SqlCommand(sql, con);
+            cmd.Parameters.AddWithValue("@schema", schema);
+            cmd.Parameters.AddWithValue("@table", table);
+            cmd.Parameters.AddWithValue("@column", column);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        private static bool IndexExists(SqlConnection con, string schema, string table, string indexName)
+        {
+            const string sql = @"
+            SELECT 1
+            FROM sys.indexes i
+            INNER JOIN sys.tables t ON t.object_id = i.object_id
+            INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+            WHERE s.name = @schema AND t.name = @table AND i.name = @index;";
+            using var cmd = new SqlCommand(sql, con);
+            cmd.Parameters.AddWithValue("@schema", schema);
+            cmd.Parameters.AddWithValue("@table", table);
+            cmd.Parameters.AddWithValue("@index", indexName);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        private static bool ForeignKeyExists(SqlConnection con, string schema, string table, string fkName)
+        {
+            const string sql = @"
+            SELECT 1
+            FROM sys.foreign_keys fk
+            INNER JOIN sys.tables t ON t.object_id = fk.parent_object_id
+            INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+            WHERE s.name = @schema AND t.name = @table AND fk.name = @fk;";
+            using var cmd = new SqlCommand(sql, con);
+            cmd.Parameters.AddWithValue("@schema", schema);
+            cmd.Parameters.AddWithValue("@table", table);
+            cmd.Parameters.AddWithValue("@fk", fkName);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        private static bool PrimaryKeyExists(SqlConnection con, string schema, string table)
+        {
+            const string sql = @"
+            SELECT 1
+            FROM sys.key_constraints kc
+            INNER JOIN sys.tables t ON t.object_id = kc.parent_object_id
+            INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+            WHERE s.name = @schema AND t.name = @table AND kc.type = 'PK';";
+            using var cmd = new SqlCommand(sql, con);
+            cmd.Parameters.AddWithValue("@schema", schema);
+            cmd.Parameters.AddWithValue("@table", table);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        private static string BuildCreateTableSql(string schema, string table, List<SqlColumnSpec> cols)
+        {
+            if (cols == null || cols.Count == 0)
+                throw new Exception($"La taula {schema}.{table} necessita columnes.");
+
+            var parts = new List<string>();
+            foreach (var c in cols)
+            {
+                var name = c.Name.Trim();
+                ValidateName(name, "column");
+
+                string type = (c.Type ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(type))
+                    throw new Exception($"Columna {schema}.{table}.{name} sense Type.");
+
+                string identity = c.Identity ? " IDENTITY(1,1)" : "";
+                string nullable = c.Nullable ? " NULL" : " NOT NULL";
+                string def = string.IsNullOrWhiteSpace(c.DefaultSql) ? "" : $" DEFAULT ({c.DefaultSql})";
+
+                parts.Add($"[{name}] {type}{identity}{def}{nullable}");
+            }
+
+            return $"CREATE TABLE [{schema}].[{table}] (" + string.Join(", ", parts) + ");";
+        }
+
+        private static string BuildAddColumnSql(string schema, string table, SqlColumnSpec c)
+        {
+            var name = c.Name.Trim();
+            ValidateName(name, "column");
+
+            string type = (c.Type ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(type))
+                throw new Exception($"Columna {schema}.{table}.{name} sense Type.");
+
+            string identity = c.Identity ? " IDENTITY(1,1)" : "";
+            string nullable = c.Nullable ? " NULL" : " NOT NULL";
+            string def = string.IsNullOrWhiteSpace(c.DefaultSql) ? "" : $" DEFAULT ({c.DefaultSql})";
+
+            return $"ALTER TABLE [{schema}].[{table}] ADD [{name}] {type}{identity}{def}{nullable};";
+        }
+    }
+}
+
+
+===== FILE: .\Services\SqlSchemaSetupService.cs =====
+using Microsoft.Data.SqlClient;
+using System.Data;
+using System.Text.RegularExpressions;
+using XNDmjApi.Functions;
+using XNDmjApi.Models.DbSetup;
+
+namespace XNDmjApi.Services
+{
+    public sealed class SqlSchemaSetupService
+    {
+        // Noms segurs: lletres/números/underscore. (evitem punts, espais, guions, etc.)
+        private static readonly Regex RxIdent = new Regex(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
+
+        // Allowlist de tipus SQL per evitar injeccions via schema.
+        // (Amplia-la quan ho necessitis, però sempre amb regex controlada.)
+        private static readonly Regex RxSqlType = new Regex(
+            @"^(int|bigint|bit|datetime2|datetime|date|uniqueidentifier|float|real|money|smallmoney|" +
+            @"nvarchar\((max|[1-9][0-9]{0,3})\)|varchar\((max|[1-9][0-9]{0,3})\)|" +
+            @"varbinary\((max|[1-9][0-9]{0,4})\)|" +
+            @"decimal\(([1-9][0-9]?),([0-9]|[1-9][0-9]?)\))$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase
+        );
+
+        private static string SafeSchema(string? schema)
+        {
+            if (string.IsNullOrWhiteSpace(schema)) return "dbo";
+            schema = schema.Trim();
+            if (!RxIdent.IsMatch(schema)) throw new Exception($"Schema invàlid: '{schema}'");
+            return schema;
+        }
+
+        private static string SafeIdent(string value, string kind)
+        {
+            value = (value ?? "").Trim();
+            if (!RxIdent.IsMatch(value)) throw new Exception($"{kind} invàlid: '{value}'");
+            return value;
+        }
+
+        private static string SafeSqlType(string sqlType)
+        {
+            sqlType = (sqlType ?? "").Trim();
+            if (!RxSqlType.IsMatch(sqlType)) throw new Exception($"SqlType no permès: '{sqlType}'");
+            return sqlType;
+        }
+
+        public EnsureSchemaResponse EnsureSchema(DbSchema schema)
+        {
+            if (schema == null) throw new Exception("Schema null.");
+            if (schema.Tables == null || schema.Tables.Count == 0) throw new Exception("Schema.Tables buit.");
+
+            // Assegurem que tenim connection string muntada
+            if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+            {
+                if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
+                    Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                Dades.SetupDades();
+            }
+
+            var resp = new EnsureSchemaResponse { Ok = true, Code = "OK", Message = "Schema garantit." };
+
+            using var con = new SqlConnection(Dades.ConnectionStringDOMENJO);
+            con.Open();
+
+            foreach (var t in schema.Tables)
+            {
+                var tableName = SafeIdent(t.Name, "TableName");
+                var schemaName = SafeSchema(t.Schema);
+                var fullName = $"[{schemaName}].[{tableName}]";
+
+                if (t.Columns == null || t.Columns.Count == 0)
+                    throw new Exception($"Taula '{tableName}': Columns buit.");
+
+                // 1) Create table if not exists (amb columnes base)
+                if (!TableExists(con, schemaName, tableName))
+                {
+                    var colsSql = new List<string>();
+                    foreach (var c in t.Columns)
+                    {
+                        colsSql.Add(BuildColumnSql(c));
+                    }
+
+                    var createSql = $@"
+IF OBJECT_ID(N'{schemaName}.{tableName}', N'U') IS NULL
+BEGIN
+    CREATE TABLE {fullName} (
+        {string.Join("," + Environment.NewLine + "        ", colsSql)}
+    );
+END
+";
+                    ExecNonQuery(con, createSql);
+                    resp.CreatedTables.Add($"{schemaName}.{tableName}");
+                }
+                else
+                {
+                    // 2) Add missing columns
+                    foreach (var c in t.Columns)
+                    {
+                        var colName = SafeIdent(c.Name, "ColumnName");
+                        if (!ColumnExists(con, schemaName, tableName, colName))
+                        {
+                            var alter = $"ALTER TABLE {fullName} ADD {BuildColumnSql(c)};";
+                            ExecNonQuery(con, alter);
+                            resp.AddedColumns.Add($"{schemaName}.{tableName}.{colName}");
+                        }
+                    }
+                }
+
+                // 3) PK (opcional) - només si no existeix cap PK
+                if (t.PrimaryKey != null && t.PrimaryKey.Count > 0)
+                {
+                    if (!HasPrimaryKey(con, schemaName, tableName))
+                    {
+                        var pkCols = t.PrimaryKey.Select(x => $"[{SafeIdent(x, "PK column")}]" ).ToList();
+                        var pkName = $"PK_{tableName}";
+                        var pkSql = $"ALTER TABLE {fullName} ADD CONSTRAINT [{pkName}] PRIMARY KEY ({string.Join(",", pkCols)});";
+                        ExecNonQuery(con, pkSql);
+                        resp.Notes.Add($"PK creada: {schemaName}.{tableName} ({string.Join(",", t.PrimaryKey)})");
+                    }
+                }
+
+                // 4) Indexes (opcional)
+                if (t.Indexes != null)
+                {
+                    foreach (var ix in t.Indexes)
+                    {
+                        var ixName = SafeIdent(ix.Name, "IndexName");
+                        if (ix.Columns == null || ix.Columns.Count == 0)
+                            throw new Exception($"Index '{ixName}' sense columns.");
+
+                        if (!IndexExists(con, schemaName, tableName, ixName))
+                        {
+                            var cols = ix.Columns.Select(x => $"[{SafeIdent(x, "IX column")}]" ).ToList();
+                            var uniq = ix.Unique ? "UNIQUE " : "";
+                            var ixSql = $"CREATE {uniq}INDEX [{ixName}] ON {fullName} ({string.Join(",", cols)});";
+                            ExecNonQuery(con, ixSql);
+                            resp.CreatedIndexes.Add($"{schemaName}.{tableName}.{ixName}");
+                        }
+                    }
+                }
+            }
+
+            return resp;
+        }
+
+        private static string BuildColumnSql(DbColumnSpec c)
+        {
+            var colName = SafeIdent(c.Name, "ColumnName");
+            var sqlType = SafeSqlType(c.SqlType);
+
+            var identity = c.Identity ? " IDENTITY(1,1)" : "";
+            var nullable = c.Nullable ? " NULL" : " NOT NULL";
+
+            // Default: permetem expressions simples, però les validem mínimament (evitem ';' i comentaris)
+            string def = "";
+            if (!string.IsNullOrWhiteSpace(c.Default))
+            {
+                var d = c.Default.Trim();
+                if (d.Contains(";") || d.Contains("--") || d.Contains("/*") || d.Contains("*/"))
+                    throw new Exception($"Default insegur a columna {colName}.");
+                def = $" CONSTRAINT [DF_{colName}] DEFAULT ({d})";
+            }
+
+            return $"[{colName}] {sqlType}{identity}{def}{nullable}";
+        }
+
+        private static void ExecNonQuery(SqlConnection con, string sql)
+        {
+            using var cmd = new SqlCommand(sql, con);
+            cmd.CommandType = CommandType.Text;
+            cmd.ExecuteNonQuery();
+        }
+
+        private static bool TableExists(SqlConnection con, string schema, string table)
+        {
+            const string q = @"
+SELECT 1
+FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = @schema AND t.name = @table;
+";
+            using var cmd = new SqlCommand(q, con);
+            cmd.Parameters.Add(new SqlParameter("@schema", SqlDbType.NVarChar, 128) { Value = schema });
+            cmd.Parameters.Add(new SqlParameter("@table", SqlDbType.NVarChar, 128) { Value = table });
+            var r = cmd.ExecuteScalar();
+            return r != null;
+        }
+
+        private static bool ColumnExists(SqlConnection con, string schema, string table, string column)
+        {
+            const string q = @"
+SELECT 1
+FROM sys.columns c
+JOIN sys.tables t ON t.object_id = c.object_id
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = @schema AND t.name = @table AND c.name = @column;
+";
+            using var cmd = new SqlCommand(q, con);
+            cmd.Parameters.Add(new SqlParameter("@schema", SqlDbType.NVarChar, 128) { Value = schema });
+            cmd.Parameters.Add(new SqlParameter("@table", SqlDbType.NVarChar, 128) { Value = table });
+            cmd.Parameters.Add(new SqlParameter("@column", SqlDbType.NVarChar, 128) { Value = column });
+            var r = cmd.ExecuteScalar();
+            return r != null;
+        }
+
+        private static bool HasPrimaryKey(SqlConnection con, string schema, string table)
+        {
+            const string q = @"
+SELECT 1
+FROM sys.indexes i
+JOIN sys.tables t ON t.object_id = i.object_id
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name=@schema AND t.name=@table AND i.is_primary_key=1;
+";
+            using var cmd = new SqlCommand(q, con);
+            cmd.Parameters.Add(new SqlParameter("@schema", SqlDbType.NVarChar, 128) { Value = schema });
+            cmd.Parameters.Add(new SqlParameter("@table", SqlDbType.NVarChar, 128) { Value = table });
+            var r = cmd.ExecuteScalar();
+            return r != null;
+        }
+
+        private static bool IndexExists(SqlConnection con, string schema, string table, string indexName)
+        {
+            const string q = @"
+SELECT 1
+FROM sys.indexes i
+JOIN sys.tables t ON t.object_id = i.object_id
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name=@schema AND t.name=@table AND i.name=@index;
+";
+            using var cmd = new SqlCommand(q, con);
+            cmd.Parameters.Add(new SqlParameter("@schema", SqlDbType.NVarChar, 128) { Value = schema });
+            cmd.Parameters.Add(new SqlParameter("@table", SqlDbType.NVarChar, 128) { Value = table });
+            cmd.Parameters.Add(new SqlParameter("@index", SqlDbType.NVarChar, 128) { Value = indexName });
+            var r = cmd.ExecuteScalar();
+            return r != null;
+        }
+    }
+}
+
+===== FILE: .\Functions\Dades.cs =====
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using SAPbobsCOM;
+using XNDmjApi.Models;
+
+namespace XNDmjApi.Functions
+{
+    public static class Dades
+    {
+
+        public static Company oCompany { get; set; }
+
+        public static string SERVER_SQL { get; set; }
+        public static string USER_SQL { get; set; }
+        public static string PWD_SQL { get; set; }
+
+        public static string DOMENJO_BBDD { get; set; }
+        public static string COMMON_BBDD { get; set; }
+        public static string PROPIES_BBDD { get; set; }
+
+        public static string COMPANY_SAP { get; set; }
+        public static string USER_SAP { get; set; }
+        public static string PWD_SAP { get; set; }
+
+        public static string ConnectionStringCOMMON { get; set; }
+        public static string ConnectionStringDOMENJO { get; set; }
+        public static string ConnectionStringPROPIES { get; set; }
+        public static string DOMEDOC_IMAGES_ROOT { get; set; }
+        public static string DOMEDOC_TECHNICALSHEETS_ROOT { get; set; }
+
+
+
+        public static void SetupDades()
+        {
+            USER_SQL = ApplicationSettings.MSSQL_USER;
+            PWD_SQL = ApplicationSettings.MSSQL_PWD;
+            SERVER_SQL = ApplicationSettings.MSSQL_SRV;
+            COMMON_BBDD = ApplicationSettings.COMMON_BBDD;
+            PROPIES_BBDD = ApplicationSettings.PROPIES_BBDD;
+
+            // ✅ FIX: fallback DB DOMENJÓ si no està informada (evita executar SQL fora de la company DB)
+            if (string.IsNullOrWhiteSpace(DOMENJO_BBDD))
+                DOMENJO_BBDD = "SBO_DOMENJO";
+
+
+            ConnectionStringDOMENJO = $"Data Source={SERVER_SQL};Initial Catalog={DOMENJO_BBDD};User ID={USER_SQL};Password={PWD_SQL}; TrustServerCertificate=True;";
+            ConnectionStringCOMMON = $"Data Source={SERVER_SQL};Initial Catalog={COMMON_BBDD};User ID={USER_SQL};Password={PWD_SQL}; TrustServerCertificate=True;";
+            ConnectionStringPROPIES = $"Data Source={SERVER_SQL};Initial Catalog={PROPIES_BBDD};User ID={USER_SQL};Password={PWD_SQL}; TrustServerCertificate=True;";
+
+            // 🔹 Arrel genèrica de documents/imatges al NAS
+            DOMEDOC_IMAGES_ROOT = @"\\10.10.60.13\imatgesweb";
+            DOMEDOC_TECHNICALSHEETS_ROOT = @"\\10.10.60.13\fitxes_tecniques";
+
+        }
+
+        public static string CompanyConnect()
+        {
+            try
+            {
+
+            Company oCompany = new Company
+                {
+                    Server = SERVER_SQL,
+                    UseTrusted = false,
+                    UserName = USER_SAP,
+                    Password = PWD_SAP,
+                    language = BoSuppLangs.ln_Spanish,
+                    DbServerType = BoDataServerTypes.dst_MSSQL2019,
+                    CompanyDB = DOMENJO_BBDD,
+                    DbUserName = USER_SQL,
+                    DbPassword = PWD_SQL
+                };
+
+                if (oCompany.Connect() == 0)
+                {
+                    Dades.oCompany = oCompany;
+                    return "OK";
+                }
+                else
+                {
+                    return oCompany.GetLastErrorDescription();
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Error desconegut: {ex.Message}";
+            }
+        }
+
+    }
+}
+
+
+===== FILE: .\Services\SAPLoginService.cs =====
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SAPbobsCOM;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Xml.Linq;
+using XNDmjApi.Functions;
+using XNDmjApi.Models;
+
+namespace XNDmjApi.Services
+{
+    public class SAPLoginService
+    {
+        public Company oCompany;
+
+        public bool ValidateUserToken(string userToken)
+        {
+            try
+            {
+                Encryption encrypt = new Encryption();
+                userToken = encrypt.TokenModify(userToken);
+                string tokenDescodificado = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, userToken);
+                string userName = tokenDescodificado.Split('#')[0];
+                string userCode = tokenDescodificado.Split('#')[1];
+                string date = tokenDescodificado.Split('#')[2];
+
+                // Validar fecha
+                DateTime fechaCaducidad = DateTime.ParseExact(date, "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+                if (DateTime.UtcNow > fechaCaducidad)
+                    return false;
+                else
+                    return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public string LoginByToken(string loginToken)
+        {
+            try
+            {
+                Encryption encrypt = new Encryption();
+                string userToken = "";
+                string encryptedUserToken = "";
+
+                string tokenDecoded = encrypt.AES256_Decrypt(encrypt.AES256_LOGIN_Key, loginToken);
+                string date = tokenDecoded.Split('#')[0];
+                string user = tokenDecoded.Split('#')[1];
+                string password = tokenDecoded.Split('#')[2];
+                string bbdd = tokenDecoded.Split('#')[3];
+
+                // Validar fecha
+                DateTime loginDate = DateTime.ParseExact(date, "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+                if (DateTime.UtcNow.Subtract(loginDate).TotalSeconds >= 300) // 5 minuts de caducitat
+                {
+                    return "-1";    // -1 = Límite de tiempo excedido
+                }
+
+                // Validar login
+                Dades.COMPANY_SAP = bbdd;
+                Dades.DOMENJO_BBDD = bbdd;
+                Dades.USER_SAP = user;
+                Dades.PWD_SAP = password;
+
+                Dades.SetupDades();
+
+                string result = Dades.CompanyConnect();
+                if (result == "OK")
+                {
+                    oCompany = Dades.oCompany;
+                }
+                else
+                {
+                    return result;
+                }
+
+                if (oCompany != null)
+                {
+                    if (oCompany.Connected == false)
+                    {
+                        Dades.oCompany = oCompany;
+                        return oCompany.GetLastErrorDescription();
+                    }
+                    else
+                    {
+                        Dades.oCompany = oCompany;
+
+                        string jsonUser = GetUserInfo(user);
+
+                        List<mdUsuari> lstjsonUser = (List<mdUsuari>)JsonConvert.DeserializeObject(jsonUser, typeof(List<mdUsuari>));
+
+                        mdUsuari mdUser = lstjsonUser[0];
+
+                        userToken = mdUser.USER_CODE + "#" + mdUser.USERID + "#" + DateTime.UtcNow.AddHours(18).ToString("yyyyMMddHHmmss"); // USER_CODE # USERID # FechaCaducidad
+                        encryptedUserToken = encrypt.AES256_Encrypt(encrypt.AES256_USER_Key, userToken);
+                        return encryptedUserToken;
+                    }
+                }
+                else
+                {
+                    return "No hi ha connexio amb la base de dades!";
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";        // -3 = Error
+            }
+        }
+
+        public string GetUserInfo(string user)
+        {
+            try
+            {
+                string query = @"
+                SELECT
+                    T0.USERID,
+                    T0.USER_CODE,
+                    T0.U_NAME,
+                    T1.govID,
+                    T1.lastName,
+                    T1.firstName,
+                    T0.E_Mail,
+
+                    -- Default group (OUDG)
+                    T0.DfltsGroup       AS DefaultGroupCode,
+                    T2.Name             AS DefaultGroupName,
+
+                    -- ✅ User Group (Authorization Group)
+                    U7.GroupId          AS UserGroupId,
+                    G.GroupName         AS UserGroupName
+
+                FROM OUSR T0
+                LEFT JOIN OHEM T1 ON T0.USERID = T1.userId
+                LEFT JOIN OUDG T2 ON T0.DfltsGroup = T2.Code
+                LEFT JOIN USR7 U7 ON U7.UserId = T0.USERID
+                LEFT JOIN OUGR G  ON G.GroupId = U7.GroupId
+
+                WHERE (T0.USER_CODE = @user OR T1.govID = @user OR T0.E_Mail = @user);
+                ";
+
+                string[] parametres = { $"user:{user}" };
+                DataTable dt = DataAccess.GetDataTable(Dades.ConnectionStringDOMENJO, query, parametres);
+
+                // Afegim SapLicense (si tenim B1Upf.xml disponible)
+                try
+                {
+                    if (dt != null && dt.Rows.Count > 0)
+                    {
+                        if (!dt.Columns.Contains("SapLicense"))
+                            dt.Columns.Add("SapLicense", typeof(string));
+
+                        string userCode = dt.Rows[0]["USER_CODE"]?.ToString() ?? "";
+                        dt.Rows[0]["SapLicense"] = TryGetSapLicenseFromB1Upf(userCode) ?? "";
+                    }
+                }
+                catch
+                {
+                    // No trenquem el login si falla la lectura del B1Upf.xml
+                }
+
+                var jsonUser = JsonConvert.SerializeObject(dt);
+                return jsonUser;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public string GetLoginToken(string user, string password, string bbdd)
+        {
+            Encryption encrypt = new Encryption();
+            string fecha = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            string tokenLogin = encrypt.AES256_Encrypt(encrypt.AES256_LOGIN_Key, fecha + '#' + user + '#' + password + '#' + bbdd);
+            return tokenLogin;
+        }
+
+        public void Release(params object[] objects)
+        {
+            foreach (var obj in objects)
+            {
+                ReleaseOne(obj);
+            }
+        }
+
+        private bool NotComObj(object o)
+        {
+            return !"System.__ComObject".Equals(o.GetType().ToString());
+        }
+
+        private void ReleaseOne(object o)
+        {
+            if (o == null || NotComObj(o))
+            {
+                return;
+            }
+
+            Marshal.ReleaseComObject(o);
+        }
+
+        // ✅ Helper d'autorització per endpoints 'write'
+        // Retorna true si el userToken SAP pertany a grup "Admin" o "Advanced" (USR7/OUGR).
+        public bool IsAdminOrAdvancedFromToken(string userToken)
+        {
+            try
+            {
+                if (!ValidateUserToken(userToken)) return false;
+
+                var encrypt = new Encryption();
+                userToken = encrypt.TokenModify(userToken);
+                string decoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, userToken);
+                var parts = decoded.Split('#');
+                if (parts.Length < 3) return false;
+
+                // Format token SAP: USER_CODE#USERID#yyyyMMddHHmmss
+                if (!int.TryParse(parts[1], out int userId) || userId <= 0) return false;
+
+                // Ens assegurem de tenir ConnectionStringDOMENJO muntada
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                    Dades.SetupDades();
+                }
+
+                string sql = @"
+                    SELECT G.GroupName
+                    FROM USR7 U7
+                    INNER JOIN OUGR G ON G.GroupId = U7.GroupId
+                    WHERE U7.UserId = @UserId;
+                ";
+
+                var prm = new List<SqlParameter>
+                {
+                    new SqlParameter("@UserId", SqlDbType.Int) { Value = userId }
+                };
+
+                var dt = DataAccess.GetTmpDataTable(Dades.ConnectionStringDOMENJO, sql, prm);
+
+                if (dt == null || dt.Rows.Count == 0) return false;
+
+                foreach (DataRow rr in dt.Rows)
+                {
+                    var g = rr["GroupName"]?.ToString() ?? "";
+                    if (g.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                        g.Equals("Advanced", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // [1B.1] Llegeix el B1Upf.xml i retorna el KeyDesc “principal” per l’usuari
+        private string? TryGetSapLicenseFromB1Upf(string userCode)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userCode)) return null;
+
+                // IMPORTANT: no suposem ruta. La definim per variable d’entorn.
+                // Ex: B1UPF_XML_PATH = C:\...\B1Upf.xml
+                string? path = Environment.GetEnvironmentVariable("B1UPF_XML_PATH");
+                if (string.IsNullOrWhiteSpace(path)) return null;
+                if (!File.Exists(path)) return null;
+
+                var doc = XDocument.Load(path);
+
+                var userNode = doc
+                    .Descendants("User")
+                    .FirstOrDefault(u =>
+                        string.Equals((string?)u.Element("UserName"), userCode, StringComparison.OrdinalIgnoreCase));
+
+                if (userNode == null) return null;
+
+                var keyDescs = userNode
+                    .Descendants("Module")
+                    .Select(m => (string?)m.Element("KeyDesc"))
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Select(s => s!.Trim())
+                    .Distinct()
+                    .ToList();
+
+                if (keyDescs.Count == 0) return null;
+
+                // Preferim una que contingui “SAP Business One”; sinó la primera
+                return keyDescs.FirstOrDefault(x => x.Contains("SAP Business One", StringComparison.OrdinalIgnoreCase))
+                       ?? keyDescs.First();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
+}
+
+===== FILE: .\Functions\DataAccess.cs =====
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using SAPbobsCOM;
+using System.Data;
+using System.Runtime.InteropServices;
+using System.Text;
+using XNDmjApi.Models;
+
+namespace XNDmjApi.Functions
+{
+    public class DataAccess
+    {
+
+        #region " Acceso a datos "
+
+        /// <summary>
+        /// Ejecuta una consulta SQL en la base de datos, y devuelve los resultados obtenidos en un objeto DataTable.
+        /// </summary>
+        /// <param name="SQL"></param>
+        /// <param name="parametros">Array de string con formato: nombre:valor</param>
+        /// <returns>Devuelve un objeto DataTable con los resultados obtenidos tras ejecución de la consulta.</returns>
+        public static DataTable GetDataTable( string connectionString, string SQL, string[] parametros)
+        {
+            try
+            {
+                // 🧠 Si no ens han passat cap cadena de connexió,
+                //     assumim que volem treballar amb la BBDD SBO_DOMENJO
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    // Si encara no s'ha muntat la connexió DOMENJÓ, la muntem ara
+                    if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                    {
+                        // Nom de la BBDD SAP de DOMENJÓ
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                        Dades.SetupDades();  // omple Dades.ConnectionStringDOMENJO
+                    }
+
+                    connectionString = Dades.ConnectionStringDOMENJO;
+                }
+
+                SqlConnection conexion = new SqlConnection(connectionString);
+                SqlCommand comando = new SqlCommand(SQL, conexion);
+                for (int i = 0; i < parametros.Length; i++)
+                {
+                    comando.Parameters.Add(new SqlParameter(parametros[i].Split(':')[0], parametros[i].Split(':')[1]));
+                    //comando.Parameters.AddWithValue(parametros[i].Split(':')[0], parametros[i].Split(':')[1]);
+                }
+                SqlDataAdapter da = new SqlDataAdapter(comando);
+                DataSet ds = new DataSet();
+                da.Fill(ds);
+                conexion.Close();
+                da.Dispose();
+                conexion.Dispose();
+                return ds.Tables[0];
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta una consulta SQL en la base de datos, y devuelve los resultados obtenidos en un string con formato JSON.
+        /// </summary>
+        /// <param name="SQL"></param>
+        /// <param name="parametros">Array de string con formato: nombre:valor</param>
+        /// <returns>Devuelve un strin con los resultados obtenidos tras ejecución de la consulta.</returns>
+        public static string GetJSon(string connectionString, string SQL, string[] parametros)
+        {
+            try
+            {
+                // 🧠 Si no ens han passat cap cadena de connexió,
+                //     assumim que volem treballar amb la BBDD SBO_DOMENJO
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    // Si encara no s'ha muntat la connexió DOMENJÓ, la muntem ara
+                    if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                    {
+                        // Nom de la BBDD SAP de DOMENJÓ
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                        Dades.SetupDades();  // omple Dades.ConnectionStringDOMENJO
+                    }
+
+                    connectionString = Dades.ConnectionStringDOMENJO;
+                }
+
+                SqlConnection conexion = new SqlConnection(connectionString);
+                conexion.Open();
+                SqlCommand comando = new SqlCommand(SQL, conexion);
+                for (int i = 0; i < parametros.Length; i++)
+                    comando.Parameters.Add(new SqlParameter(parametros[i].Split(':')[0], parametros[i].Split(':')[1]));
+
+                SqlDataReader oReader = comando.ExecuteReader();
+
+                if (oReader != null)
+                {
+                    string jsonResult = "";
+                    DataTable dataTable = new DataTable();
+                    dataTable.Load(oReader);
+                    jsonResult = JsonConvert.SerializeObject(dataTable);
+                    return jsonResult;
+                }
+
+                return null;
+
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta una consulta SQL en la base de datos, y devuelve los resultados obtenidos en un objeto DataTable.
+        /// Este método es vulnerable a inyección de dependencias, por lo que debe usarse sólamente de forma interna.
+        /// Para consultas que vengan desde fuera, usar GetDataTable.
+        /// </summary>
+        /// <param name="SQL"></param>
+        /// <param name="parametros">Array de string con formato: nombre:valor</param>
+        /// <returns>Devuelve un objeto DataTable con los resultados obtenidos tras ejecución de la consulta.</returns>
+        public static DataTable GetTmpDataTable(string connectionString, string SQL, List<SqlParameter> Parameters)
+        {
+            try
+            {
+                // 🧠 Si no ens han passat cap cadena de connexió,
+                //     assumim que volem treballar amb la BBDD SBO_DOMENJO
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    // Si encara no s'ha muntat la connexió DOMENJÓ, la muntem ara
+                    if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                    {
+                        // Nom de la BBDD SAP de DOMENJÓ
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                        Dades.SetupDades();  // omple Dades.ConnectionStringDOMENJO
+                    }
+
+                    connectionString = Dades.ConnectionStringDOMENJO;
+                }
+
+                SqlConnection conexion = new SqlConnection(connectionString);
+                SqlCommand comando = new SqlCommand(SQL, conexion);
+
+                comando.Parameters.AddRange(Parameters.ToArray());
+
+                SqlDataAdapter da = new SqlDataAdapter(comando);
+                DataSet ds = new DataSet();
+                da.Fill(ds);
+                conexion.Close();
+                da.Dispose();
+                conexion.Dispose();
+                return ds.Tables[0];
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+
+        /// <summary>
+        /// Ejecuta un procedimiento almacenado en la base de datos, y devuelve los resultados obtenidos en un objeto DataTable.
+        /// </summary>
+        /// <param name="procedimientoAlmacenado"></param>
+        /// <param name="parametros"></param>
+        /// <returns>Devuelve un objeto DataTable con los resultados obtenidos tras ejecutar el procedimiento almacenado.</returns>
+        public static DataTable ExecuteStoredProcedure(string connectionString, string procedimientoAlmacenado, SqlParameter[] parametros)
+        {
+            try
+            {
+                // 🧠 Si no ens han passat cap cadena de connexió,
+                //     assumim que volem treballar amb la BBDD SBO_DOMENJO
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    // Si encara no s'ha muntat la connexió DOMENJÓ, la muntem ara
+                    if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                    {
+                        // Nom de la BBDD SAP de DOMENJÓ
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                        Dades.SetupDades();  // omple Dades.ConnectionStringDOMENJO
+                    }
+
+                    connectionString = Dades.ConnectionStringDOMENJO;
+                }
+
+                SqlConnection conexion = new SqlConnection(connectionString);
+                SqlCommand comando = new SqlCommand();
+                comando.CommandType = CommandType.StoredProcedure;
+                comando.CommandText = procedimientoAlmacenado;
+                comando.Connection = conexion;
+                if (parametros != null)
+                {
+                    for (int i = 0; i < parametros.Length; i++)
+                    {
+                        if (parametros[i].DbType == DbType.DateTime && parametros[i].Value != null) { parametros[i].Value = parametros[i].Value.ToString().Replace(" ", "T"); }
+                        if (parametros[i].DbType == DbType.DateTime && parametros[i].SqlValue != null) { parametros[i].SqlValue = parametros[i].SqlValue.ToString().Replace(" ", "T"); }
+                        comando.Parameters.Add(parametros[i]);
+                    }
+                }
+                DataTable dt = new DataTable();
+                conexion.Open();
+                dt.Load(comando.ExecuteReader());
+                conexion.Close();
+                comando.Dispose(); conexion.Dispose();
+                return dt;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+
+        /// <summary>
+        /// Ejecutar un comando SQL en la base de datos, sin devolución de resultados.
+        /// </summary>
+        /// <param name="SQL"></param>
+        public static string ExecuteQuery(string connectionString, string SQL, SqlParameter[] parametros)
+        {
+            try
+            {
+                // 🧠 Si no ens han passat cap cadena de connexió,
+                //     assumim que volem treballar amb la BBDD SBO_DOMENJO
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    // Si encara no s'ha muntat la connexió DOMENJÓ, la muntem ara
+                    if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                    {
+                        // Nom de la BBDD SAP de DOMENJÓ
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                        Dades.SetupDades();  // omple Dades.ConnectionStringDOMENJO
+                    }
+
+                    connectionString = Dades.ConnectionStringDOMENJO;
+                }
+
+                SqlConnection con = new SqlConnection(connectionString);
+                SqlCommand cmd = new SqlCommand(SQL, con);
+                if (parametros != null)
+                {
+                    for (int i = 0; i < parametros.Length; i++)
+                    {
+                        //if (parametros[i].DbType == DbType.DateTime && parametros[i].Value != null) { parametros[i].Value = parametros[i].Value.ToString().Replace(" ", "T"); }
+                        //if (parametros[i].DbType == DbType.DateTime && parametros[i].SqlValue != null) { parametros[i].SqlValue = parametros[i].SqlValue.ToString().Replace(" ", "T"); }
+                        cmd.Parameters.Add(parametros[i]);
+                    }
+                }
+                con.Open();
+                cmd.ExecuteNonQuery();
+                con.Close();
+                return cmd.ToString();
+            } catch (Exception e) {
+                return e.Message;
+            }
+        }
+
+        #endregion
+
+
+        #region " Funciones para convertir DataTables/DataReaders a JSON "
+
+        /// <summary>
+        /// Datatable a JSON
+        /// </summary>
+        /// <param name="table"></param>
+        /// <returns></returns>
+        public static string DataTableToJSON(DataTable tabla)
+        {
+            var JSONString = new StringBuilder();
+            if (tabla.Rows.Count > 0)
+            {
+                JSONString.Append("[");
+                for (int i = 0; i < tabla.Rows.Count; i++)
+                {
+                    JSONString.Append("{");
+                    for (int j = 0; j < tabla.Columns.Count; j++)
+                    {
+                        if (tabla.Columns[j].DataType == System.Type.GetType("System.DateTime"))
+                        {
+                            if (tabla.Rows[i][j] is DBNull)
+                                JSONString.Append("\"" + tabla.Columns[j].ColumnName.ToString() + "\":" + "\"" + DBNull.Value + "\"");
+                            else
+                                JSONString.Append("\"" + tabla.Columns[j].ColumnName.ToString() + "\":" + "\"" + Convert.ToDateTime(tabla.Rows[i][j]).ToString("yyyy-MM-dd HH:mm:ss") + "\"");
+                        }
+                        else if (tabla.Columns[j].DataType == System.Type.GetType("System.String"))
+                        {
+                            JSONString.Append("\"" + tabla.Columns[j].ColumnName.ToString() + "\":" + "\"" + DataTableToJson_CorreccionesJSONString(tabla.Rows[i][j].ToString()) + "\"");
+                        }
+                        else
+                        {
+                            JSONString.Append("\"" + tabla.Columns[j].ColumnName.ToString() + "\":" + "\"" + tabla.Rows[i][j].ToString() + "\"");
+                        }
+
+                        if (j < tabla.Columns.Count - 1) { JSONString.Append(","); }
+                    }
+                    JSONString.Append("}");
+                    if (i < tabla.Rows.Count - 1) { JSONString.Append(","); }
+                }
+                JSONString.Append("]");
+            }
+            else
+            {
+                JSONString.Append("[]");
+            }
+
+            // Correcciones de caracters que podrian romper el JSON
+            JSONString = JSONString.Replace("\\", "\\\\");          // para que las rutas UNC no fallen en cliente
+            return JSONString.ToString();
+        }
+
+        private static string DataTableToJson_CorreccionesJSONString(string json)
+        {
+            json = json.Replace("\"", "'");
+            json = json.Replace("\t", " ");
+            json = json.Replace("\r", "");
+            json = json.Replace("\n", "");
+            return json;
+        }
+
+
+        /// <summary>
+        /// DataReader a JSON
+        /// </summary>
+        /// <param name="dr"></param>
+        /// <returns></returns>
+        private static string DataReaderToJson(SqlDataReader dr)
+        {
+            var dt = new DataTable();
+            dt.Load(dr);
+            return DataTableToJSON(dt);
+        }
+
+        /// <summary>
+        /// Stored Procedure to JSON
+        /// </summary>
+        /// <param name="procedimientoAlmacenado"></param>
+        /// <param name="parametros"></param>
+        /// <param name="dr"></param>
+        /// <returns></returns>
+        public static string StoredProcedureToJson(string procedimientoAlmacenado, SqlParameter[] parametros, SqlDataReader dr)
+        {
+            var json = new StringBuilder();
+
+            int numParametrosEntrada = 0;
+            int numParametrosSalida = 0;
+
+            // Inicio
+            json.Append("[{");
+            json.Append("\"SP\": \"" + procedimientoAlmacenado + "\"");
+            json.Append(",");
+            // Parametros de entrada
+            json.Append("\"ParametrosEntrada\":{");
+            for (int i = 0; i < parametros.Length; i++)
+            {
+                if (parametros[i].Direction == ParameterDirection.Input)
+                {
+                    if (numParametrosEntrada > 0) json.Append(",");
+                    json.Append("\"" + parametros[i].ParameterName + "\":\"" + parametros[i].Value + "\"");
+                    numParametrosEntrada += 1;
+                }
+            }
+            if (numParametrosEntrada == 0) { json.Append("\"Sin parámetros de entrada\": \"Fin\""); }
+            json.Append("},");
+            // Parametros de salida
+            json.Append("\"ParametrosSalida\":{");
+            for (int i = 0; i < parametros.Length; i++)
+            {
+                if (parametros[i].Direction == ParameterDirection.Output)
+                {
+                    if (numParametrosSalida > 0) json.Append(",");
+                    json.Append("\"" + parametros[i].ParameterName + "\":\"" + parametros[i].Value + "\"");
+                    numParametrosSalida += 1;
+                }
+            }
+            if (numParametrosSalida == 0) { json.Append("\"Sin parámetros de salida\": \"Fin\""); }
+            json.Append("},");
+            // Data
+            json.Append("\"Data\":" + DataReaderToJson(dr));
+            // Fin
+            json.Append("}]");
+
+            json = json.Replace("\\", "\\\\");  // 15/11/2019, para que las rutas UNC no fallen en cliente
+            return json.ToString();
+        }
+
+        #endregion
+
+
+        #region " Acceso a datos con resultados en formato JSON "
+
+        /// <summary>
+        /// Ejecutar una Query y devolver los resultados en formato JSON
+        /// </summary>
+        /// <param name="SQL"></param>
+        /// <returns></returns>
+        public static async Task<string> JsonDataReader(string connectionString, string SQL)
+        {
+            // 🧠 Si no ens han passat cap cadena de connexió,
+            //     assumim que volem treballar amb la BBDD SBO_DOMENJO
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                // Si encara no s'ha muntat la connexió DOMENJÓ, la muntem ara
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    // Nom de la BBDD SAP de DOMENJÓ
+                    Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                    Dades.SetupDades();  // omple Dades.ConnectionStringDOMENJO
+                }
+
+                connectionString = Dades.ConnectionStringDOMENJO;
+            }
+
+            string json = "";
+            using (SqlConnection con = new SqlConnection(connectionString))
+            {
+                SqlCommand cmd = new SqlCommand(SQL, con);
+                await con.OpenAsync();
+                SqlDataReader dr = await cmd.ExecuteReaderAsync();
+                json = DataReaderToJson(dr);
+                dr.Close();
+            }
+            return json;
+        }
+
+
+        /// <summary>
+        /// Ejecutar un Stored Procedure y devolver los resultados en formato JSON
+        /// </summary>
+        /// <param name="procedimientoAlmacenado"></param>
+        /// <param name="parametros"></param>
+        /// <returns></returns>
+        public static async Task<string> JsonStoredProcedure(string connectionString, string procedimientoAlmacenado, SqlParameter[] parametros)
+        {
+            // 🧠 Si no ens han passat cap cadena de connexió,
+            //     assumim que volem treballar amb la BBDD SBO_DOMENJO
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                // Si encara no s'ha muntat la connexió DOMENJÓ, la muntem ara
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    // Nom de la BBDD SAP de DOMENJÓ
+                    Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                    Dades.SetupDades();  // omple Dades.ConnectionStringDOMENJO
+                }
+
+                connectionString = Dades.ConnectionStringDOMENJO;
+            }
+
+            string json = "";
+            using (SqlConnection con = new SqlConnection(connectionString))
+            {
+                SqlCommand cmd = new SqlCommand();
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.CommandText = procedimientoAlmacenado;
+                cmd.Connection = con;
+                if (parametros != null)
+                {
+                    for (int i = 0; i < parametros.Length; i++)
+                    {
+                        if (parametros[i].DbType == DbType.DateTime && parametros[i].Value != null) { parametros[i].Value = parametros[i].Value.ToString().Replace(" ", "T"); }
+                        if (parametros[i].DbType == DbType.DateTime && parametros[i].SqlValue != null) { parametros[i].SqlValue = parametros[i].SqlValue.ToString().Replace(" ", "T"); }
+                        cmd.Parameters.Add(parametros[i]);
+                    }
+                }
+                await con.OpenAsync();
+                SqlDataReader dr = await cmd.ExecuteReaderAsync();
+                json = StoredProcedureToJson(procedimientoAlmacenado, parametros, dr);
+                dr.Close();
+            }
+            return json;
+        }
+        #endregion
+
+        public static void EnsureConnection(string BBDD)
+        {
+            // Si la connexió no està muntada o la BBDD ha canviat, la (re)muntem
+            if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+            {
+                Dades.DOMENJO_BBDD = BBDD;  // el mateix que fas a CreateNewUser
+                Dades.SetupDades();
+            }
+        }
+
+
+
+
+    }
+}
+
+
+===== FILE: .\Program.cs =====
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using System.Net.Http.Headers;
+using System.Text;
+using XNDmjApi.Functions;
+using XNDmjApi.Infrastructure.Options;
+using XNDmjApi.Infrastructure.Services;
+using XNDmjApi.Loxone.Data;
+using XNDmjApi.Loxone.Options;
+using XNDmjApi.Loxone.Services;
+using XNDmjApi.Models;
+using XNDmjApi.QrMulti.Services;
+using XNDmjApi.Services;
+
+// IMPORTANT: en el teu setup, aquest és el model que compila
+using Microsoft.OpenApi;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddSwaggerGen(c =>
+{
+    c.CustomSchemaIds(t => t.FullName ?? t.Name);
+
+    // IFormFile upload support (model Microsoft.OpenApi)
+    c.MapType<IFormFile>(() => new OpenApiSchema
+    {
+        Type = JsonSchemaType.String,
+        Format = "binary"
+    });
+
+    // Definició API Key (botó Authorize existirà, però no ens hi refiem per injectar headers)
+    c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Description = "Introdueix la clau d'admin (header X-Api-Key).",
+        Name = "X-Api-Key",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey
+    });
+
+    // En lloc de SecurityRequirement (que et porta a conflictes), afegim header param a totes les operacions
+    c.OperationFilter<AddApiKeyHeaderParameter>();
+});
+
+builder.Configuration.GetSection("BBDD").Get<ApplicationSettings>();
+
+builder.Services.AddCors();
+
+// Serveis existents
+builder.Services.AddScoped<CustomerPortfolioService>();
+
+// ──────────────────────────────────────────────────────────────
+// LOXONE · DI + Config
+// ──────────────────────────────────────────────────────────────
+builder.Services.Configure<LoxoneOptions>(builder.Configuration.GetSection("Loxone"));
+builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection("Admin"));
+builder.Services.Configure<TokenPolicyOptions>(builder.Configuration.GetSection("TokenPolicy"));
+builder.Services.Configure<DbMigrationsOptions>(builder.Configuration.GetSection("DbMigrations"));
+
+builder.Services.AddScoped<DbMigrationRunner>();
+builder.Services.AddScoped<QrMultiDbInitializer>();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    var cs = builder.Configuration.GetConnectionString("LoxoneDb");
+    if (string.IsNullOrWhiteSpace(cs))
+        cs = "Data Source=App_Data\\qrloxone.db";
+
+    options.UseSqlite(cs);
+});
+
+builder.Services.AddHttpClient("loxone").ConfigureHttpClient((sp, client) =>
+{
+    var opt = sp.GetRequiredService<IOptions<LoxoneOptions>>().Value;
+
+    if (!string.IsNullOrWhiteSpace(opt.BaseUrl))
+    {
+        var baseUrl = opt.BaseUrl.TrimEnd('/') + "/";
+        client.BaseAddress = new Uri(baseUrl);
+    }
+
+    if (!string.IsNullOrWhiteSpace(opt.Username))
+    {
+        var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{opt.Username}:{opt.Password}"));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
+    }
+});
+
+builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<LoxoneCommandService>();
+
+var app = builder.Build();
+
+// DB bootstrap (idempotent)
+using (var scope = app.Services.CreateScope())
+{
+    var runner = scope.ServiceProvider.GetRequiredService<DbMigrationRunner>();
+    await runner.ApplyOnStartupAsync(CancellationToken.None);
+}
+
+// Swagger sempre ON
+app.UseSwagger();
+app.UseStaticFiles();
+app.UseSwaggerUI(c =>
+{
+    c.ConfigObject.AdditionalItems["persistAuthorization"] = "true";
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "XNDmjApi v1");
+    // Sense interceptors (en el teu cas no s'aplicaven)
+});
+
+app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.UseCors(options =>
+    options.WithOrigins("*")
+           .AllowAnyHeader()
+           .AllowAnyMethod());
+
+app.MapControllers();
+app.Run();
+
+
+// ──────────────────────────────────────────────────────────────
+// OperationFilter compatible amb Microsoft.OpenApi (IOpenApiParameter + JsonSchemaType)
+// ──────────────────────────────────────────────────────────────
+public sealed class AddApiKeyHeaderParameter : IOperationFilter
+{
+    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+    {
+        // En aquest model: IList<IOpenApiParameter>
+        if (operation.Parameters == null)
+            operation.Parameters = new List<IOpenApiParameter>();
+
+        // Evita duplicats
+        foreach (var p in operation.Parameters)
+        {
+            if (string.Equals(p.Name, "X-Api-Key", StringComparison.OrdinalIgnoreCase) &&
+                p.In == ParameterLocation.Header)
+            {
+                return;
+            }
+        }
+
+        operation.Parameters.Add(new OpenApiParameter
+        {
+            Name = "X-Api-Key",
+            In = ParameterLocation.Header,
+            Required = false,
+            Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+            Description = "Clau d'admin per endpoints protegits"
+        });
+    }
+}
+
+===== GREP: EnsureSchema routes =====
+E:\Programacio\C#\XNApiRest\Controllers\DbSetupController.cs:24: [HttpPost("EnsureSchema")]
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Controllers\DbSetupController.cs:24: [HttpPost("EnsureSchema")]
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Controllers\DbSetupController.cs:24: [HttpPost("EnsureSchema")]
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupController.cs:24: [HttpPost("EnsureSchema")]
+
+===== GREP: schemaJson / tables usage =====
+E:\Programacio\C#\XNApiRest\Controllers\DbSetupController.cs:19: public string schemaJson { get; set; } = string.Empty;
+E:\Programacio\C#\XNApiRest\Controllers\DbSetupController.cs:29: var schemaJson = form.schemaJson;
+E:\Programacio\C#\XNApiRest\Controllers\DbSetupController.cs:45: if (string.IsNullOrWhiteSpace(schemaJson))
+E:\Programacio\C#\XNApiRest\Controllers\DbSetupController.cs:46: return BadRequest(new { ok = false, error = "MISSING_SCHEMAJSON" });
+E:\Programacio\C#\XNApiRest\Controllers\DbSetupController.cs:51: spec = JsonConvert.DeserializeObject<SqlSchemaSpec>(schemaJson);
+E:\Programacio\C#\XNApiRest\Controllers\DbSetupController.cs:55: return BadRequest(new { ok = false, error = "BAD_SCHEMAJSON", message = ex.Message });
+E:\Programacio\C#\XNApiRest\Models\SqlSchemaSpec.cs:8: public List<SqlTableSpec> Tables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\Models\DbSetup\DbSetupModels.cs:5: public sealed class EnsureSchemaRequest
+E:\Programacio\C#\XNApiRest\Models\DbSetup\DbSetupModels.cs:13: public DbSchema Schema { get; set; } = new DbSchema();
+E:\Programacio\C#\XNApiRest\Models\DbSetup\DbSetupModels.cs:16: public sealed class DbSchema
+E:\Programacio\C#\XNApiRest\Models\DbSetup\DbSetupModels.cs:19: public List<DbTableSpec> Tables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\Models\DbSetup\DbSetupModels.cs:81: public List<string> CreatedTables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\Services\SqlSchemaService.cs:28: return new EnsureResult { Ok = false, Code = "MISSING_SCHEMA", Message = "schemaJson sense taules." };
+E:\Programacio\C#\XNApiRest\Services\SqlSchemaSetupService.cs:46: public EnsureSchemaResponse EnsureSchema(DbSchema schema)
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Controllers\DbSetupController.cs:19: public string schemaJson { get; set; } = string.Empty;
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Controllers\DbSetupController.cs:29: var schemaJson = form.schemaJson;
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Controllers\DbSetupController.cs:45: if (string.IsNullOrWhiteSpace(schemaJson))
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Controllers\DbSetupController.cs:46: return BadRequest(new { ok = false, error = "MISSING_SCHEMAJSON" });
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Controllers\DbSetupController.cs:51: spec = JsonConvert.DeserializeObject<SqlSchemaSpec>(schemaJson);
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Controllers\DbSetupController.cs:55: return BadRequest(new { ok = false, error = "BAD_SCHEMAJSON", message = ex.Message });
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Models\SqlSchemaSpec.cs:8: public List<SqlTableSpec> Tables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Models\DbSetup\DbSetupModels.cs:5: public sealed class EnsureSchemaRequest
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Models\DbSetup\DbSetupModels.cs:13: public DbSchema Schema { get; set; } = new DbSchema();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Models\DbSetup\DbSetupModels.cs:16: public sealed class DbSchema
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Models\DbSetup\DbSetupModels.cs:19: public List<DbTableSpec> Tables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Models\DbSetup\DbSetupModels.cs:81: public List<string> CreatedTables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_103838\src\Services\SqlSchemaService.cs:28: return new EnsureResult { Ok = false, Code = "MISSING_SCHEMA", Message = "schemaJson sense taules." };
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Controllers\DbSetupController.cs:19: public string schemaJson { get; set; } = string.Empty;
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Controllers\DbSetupController.cs:29: var schemaJson = form.schemaJson;
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Controllers\DbSetupController.cs:45: if (string.IsNullOrWhiteSpace(schemaJson))
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Controllers\DbSetupController.cs:46: return BadRequest(new { ok = false, error = "MISSING_SCHEMAJSON" });
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Controllers\DbSetupController.cs:51: spec = JsonConvert.DeserializeObject<SqlSchemaSpec>(schemaJson);
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Controllers\DbSetupController.cs:55: return BadRequest(new { ok = false, error = "BAD_SCHEMAJSON", message = ex.Message });
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Models\SqlSchemaSpec.cs:8: public List<SqlTableSpec> Tables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Models\DbSetup\DbSetupModels.cs:5: public sealed class EnsureSchemaRequest
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Models\DbSetup\DbSetupModels.cs:13: public DbSchema Schema { get; set; } = new DbSchema();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Models\DbSetup\DbSetupModels.cs:16: public sealed class DbSchema
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Models\DbSetup\DbSetupModels.cs:19: public List<DbTableSpec> Tables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Models\DbSetup\DbSetupModels.cs:81: public List<string> CreatedTables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dmj_diag_20260128_104800\src\Services\SqlSchemaService.cs:28: return new EnsureResult { Ok = false, Code = "MISSING_SCHEMA", Message = "schemaJson sense taules." };
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupController.cs:19: public string schemaJson { get; set; } = string.Empty;
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupController.cs:29: var schemaJson = form.schemaJson;
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupController.cs:45: if (string.IsNullOrWhiteSpace(schemaJson))
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupController.cs:46: return BadRequest(new { ok = false, error = "MISSING_SCHEMAJSON" });
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupController.cs:51: spec = JsonConvert.DeserializeObject<SqlSchemaSpec>(schemaJson);
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupController.cs:55: return BadRequest(new { ok = false, error = "BAD_SCHEMAJSON", message = ex.Message });
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupModels.cs:5: public sealed class EnsureSchemaRequest
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupModels.cs:13: public DbSchema Schema { get; set; } = new DbSchema();
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupModels.cs:16: public sealed class DbSchema
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupModels.cs:19: public List<DbTableSpec> Tables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\DbSetupModels.cs:81: public List<string> CreatedTables { get; set; } = new();
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\SqlSchemaService.cs:28: return new EnsureResult { Ok = false, Code = "MISSING_SCHEMA", Message = "schemaJson sense taules." };
+E:\Programacio\C#\XNApiRest\_dump_ensure_schema_20260128_094128\SqlSchemaSpec.cs:8: public List<SqlTableSpec> Tables { get; set; } = new();
+
+DONE -> E:\Programacio\C#\XNApiRest\_dmjapi_diag_ensure_schema_20260128_111526.txt

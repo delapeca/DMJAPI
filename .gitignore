@@ -1,0 +1,35 @@
+# --- Visual Studio / .NET ---
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.nupkg
+*.log
+
+# --- IIS / publish artifacts (si n'hi ha) ---
+*.publish.xml
+
+# --- Secrets / config locals ---
+appsettings.json
+appsettings.*.json
+
+# --- Backups i dumps DOMENJÓ ---
+*.bak_*
+_dmj_patch_out_*.txt
+_dump_*.txt
+
+# --- Altres temporals ---
+.DS_Store
+Thumbs.db
+
+# --- App data (DB local) ---
+App_Data/
+*.db
+*.db-*
+
+
+# --- Disabled/backup controllers ---
+Controllers/*.disabled_*
+

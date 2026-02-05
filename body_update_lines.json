@@ -1,0 +1,5 @@
+﻿{
+  "lines": [
+    { "entity":"OCPR", "field":"Tel1", "oldValue":"931111111", "newValue":"932222255", "isSensitive": false }
+  ]
+}

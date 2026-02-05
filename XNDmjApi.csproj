@@ -1,0 +1,233 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>AnyCPU;x86</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="App_Data\qrloxone.db" />
+    <None Remove="Querys\GetBusinessPartners.sql" />
+    <None Remove="Querys\GetBusinessPartnersWithOpenPurcharseOrders.sql" />
+    <None Remove="Querys\GetCustomerReceiptsSummary.sql" />
+    <None Remove="Querys\GetItem.sql" />
+    <None Remove="Querys\GetItemPurchasedHistory.sql" />
+    <None Remove="Querys\GetItems.sql" />
+    <None Remove="Querys\GetItemsGroups.sql" />
+    <None Remove="Querys\GetItemsPurchasedSummary.sql" />
+    <None Remove="Querys\GetItemsSalesPrices.sql" />
+    <None Remove="Querys\GetItemsSubGroups.sql" />
+    <None Remove="Querys\GetOpenPurcharseOrderFromBP.sql" />
+    <None Remove="Querys\GetOpenPurcharseOrdersFromBP.sql" />
+    <None Remove="Querys\GetOpenPurchaseOrder.sql" />
+    <None Remove="Querys\GetOpenPurchaseOrders.sql" />
+    <None Remove="Querys\GetOutletGroups.sql" />
+    <None Remove="Querys\GetOutletItemByCode.sql" />
+    <None Remove="Querys\GetOutletItemImage.sql" />
+    <None Remove="Querys\GetOutletItemsBySubGroup.sql" />
+    <None Remove="Querys\GetOutletSubGroups.sql" />
+    <None Remove="Querys\GetOutletSubGroupsByGroup.sql" />
+    <None Remove="Querys\GetProductTree.sql" />
+    <None Remove="Querys\GetSalesDeliveryNoteDetail.sql" />
+    <None Remove="Querys\GetSalesDeliveryNotesSummary.sql" />
+    <None Remove="Querys\GetSalesInvoiceDetail.sql" />
+    <None Remove="Querys\GetSalesInvoicesSummary.sql" />
+    <None Remove="Querys\GetSalesReturnDetail.sql" />
+    <None Remove="Querys\GetSalesReturnsSummary.sql" />
+    <None Remove="Querys\GetTemporalGoodsReceipt.sql" />
+    <None Remove="Querys\GetTreeItem.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <COMReference Include="SAPbobsCOM">
+      <WrapperTool>tlbimp</WrapperTool>
+      <VersionMinor>0</VersionMinor>
+      <VersionMajor>10</VersionMajor>
+      <Guid>fc8030be-f5d2-4b8e-8f92-44228fe30100</Guid>
+      <Lcid>0</Lcid>
+      <Isolated>false</Isolated>
+      <EmbedInteropTypes>true</EmbedInteropTypes>
+    </COMReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="App_Data\qrloxone.db">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <EmbeddedResource Include="Querys\GetBusinessPartners.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetBusinessPartnersWithOpenPurcharseOrders.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetCustomerReceiptsSummary.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetItem.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetItems.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetItemsGroups.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetItemsPurchasedSummary.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetItemsSalesPrices.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetItemsSubGroups.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetSalesDeliveryNoteDetail.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetSalesDeliveryNotesSummary.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetSalesInvoiceDetail.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetSalesInvoicesSummary.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetSalesOfferDetail.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetSalesOffersSummary.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetOpenPurcharseOrderFromBP.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOpenPurcharseOrdersFromBP.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOpenPurchaseOrders.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOpenPurchaseOrder.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetSalesOrdersDetail.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetSalesOrdersSummary.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetOutletGroups.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOutletItemByCode.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOutletItemImage.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOutletItemsBySubGroup.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOutletSubGroups.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetOutletSubGroupsByGroup.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetProductTree.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetSalesReturnDetail.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetSalesReturnsSummary.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetTemporalGoodsReceipt.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\GetTreeItem.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetItemPurchasedHistory.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupObres_GetList.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupObres_GetDetail.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupObres_Create.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupObres_UpdateOpenFields.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupObres_SetActive.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupOperaris_GetList.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupOperaris_GetDetail.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupOperaris_Create.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupOperaris_Update.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Querys\SetupOperaris_SetActive.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="Querys\GetClientProfile.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+
+
+    <Content Include="Assets\Qr\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.5" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="QRCoder" Version="1.7.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+
+    <PackageReference Include="Microsoft.OpenApi" Version="2.3.0" />
+
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.0.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Filters" Version="10.0.1" />
+
+    <PackageReference Include="System.Drawing.Common" Version="10.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.5" />
+  </ItemGroup>
+  
+</Project>
+
+
+

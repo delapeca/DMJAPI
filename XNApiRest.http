@@ -1,0 +1,6 @@
+@XNApiRest_HostAddress = http://localhost:5273
+
+GET {{XNApiRest_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,13 @@
+﻿{
+  "cardCode": "C12345",
+  "kind": "contact",
+  "action": "create",
+  "targetId": 123,
+  "targetName": "Contacte",
+  "targetJson": { "dummy": true },
+  "reason": "Prova extranet TEST",
+  "requestedBy": { "userId": 10, "email": "client@dominio.com" },
+  "lines": [
+    { "entity": "OCPR", "field": "Tel1", "oldValue": "931111111", "newValue": "932222222", "isSensitive": false }
+  ]
+}
