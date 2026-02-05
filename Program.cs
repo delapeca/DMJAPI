@@ -47,7 +47,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 
     // En lloc de SecurityRequirement (que et porta a conflictes), afegim header param a totes les operacions
-    c.OperationFilter<AddApiKeyHeaderParameter>();
+    //c.OperationFilter<AddApiKeyHeaderParameter>();
 });
 
 builder.Configuration.GetSection("BBDD").Get<ApplicationSettings>();
