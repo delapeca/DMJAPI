@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using XNDmjApi.Functions;
-using XNDmjApi.Models;
+using XNDmjApi.Models.DbSetup;
 using XNDmjApi.Services;
 
 namespace XNDmjApi.Controllers
@@ -11,28 +11,17 @@ namespace XNDmjApi.Controllers
     {
         private readonly SAPLoginService _sapLogin = new SAPLoginService();
 
-        // Body JSON per Swagger:
-        // {
-        //   "userToken": "...",
-        //   "schema": { "tables": [ ... ] }
-        // }
-        public sealed class EnsureSchemaBody
-        {
-            public string userToken { get; set; } = string.Empty;
-            public SqlSchemaSpec schema { get; set; } = new SqlSchemaSpec();
-        }
-
         // POST api/DbSetup/EnsureSchema
         // Només Intranet: requereix userToken SAP i grup Admin/Advanced
         [HttpPost("EnsureSchema")]
         [Consumes("application/json")]
         public ActionResult EnsureSchema(
-            [FromBody] EnsureSchemaBody body,
+            [FromBody] EnsureSchemaRequest body,
             [FromHeader(Name = "X-DMJ-Confirm-Db")] string? confirmDb
         )
         {
-            var userToken = body?.userToken ?? "";
-            var schema = body?.schema;
+            var userToken = body?.UserToken ?? "";
+            var schema = body?.Schema;
 
             if (string.IsNullOrWhiteSpace(userToken))
                 return BadRequest(new { ok = false, error = "MISSING_USERTOKEN" });
@@ -40,7 +29,7 @@ namespace XNDmjApi.Controllers
             if (!_sapLogin.ValidateUserToken(userToken))
                 return BadRequest(new { ok = false, error = "TOKEN_EXPIRED" });
 
-            // IMPORTANT: La DB ve del context SAP (Dades.DOMENJO_BBDD). NO fallback a SBO_DOMENJO.
+            // IMPORTANT: La DB ve del context SAP (Dades.DOMENJO_BBDD). NO fallback.
             Response.Headers["X-DMJ-DB"] = (Dades.DOMENJO_BBDD ?? "").ToString();
             if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
                 return BadRequest(new { ok = false, error = "DB_CONTEXT_MISSING" });
@@ -67,7 +56,7 @@ namespace XNDmjApi.Controllers
             try
             {
                 var svc = new SqlSchemaService();
-                var resp = svc.Ensure(schema);
+                var resp = svc.Ensure(schema); // DI-API UDT/UDO
                 return Ok(resp);
             }
             catch (System.Exception ex)

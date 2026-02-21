@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using XNDmjApi.Services;
-using XNDmjApi.Infrastructure.ApiKeys;
-using XNDmjApi.Functions;  // ?? AFEGIT per ProfileApiKey
 
 namespace XNDmjApi.Controllers.IntranetSetup
 {
@@ -12,9 +10,6 @@ namespace XNDmjApi.Controllers.IntranetSetup
         [HttpPost("GetList")]
         public IActionResult GetList([FromForm] string cardCode, [FromForm] string? onlyActive = null)
         {
-            var fail = RequireProfileAndSelectDb(out var profile);
-            if (fail != null) return fail;
-
             if (string.IsNullOrWhiteSpace(cardCode))
                 return BadRequest(new { error = "MISSING_CARDCODE" });
 
@@ -26,9 +21,6 @@ namespace XNDmjApi.Controllers.IntranetSetup
         [HttpPost("GetDetail")]
         public IActionResult GetDetail([FromForm] string cardCode, [FromForm] int code)
         {
-            var fail = RequireProfileAndSelectDb(out var profile);
-            if (fail != null) return fail;
-
             if (string.IsNullOrWhiteSpace(cardCode))
                 return BadRequest(new { error = "MISSING_CARDCODE" });
 
@@ -47,9 +39,6 @@ namespace XNDmjApi.Controllers.IntranetSetup
             [FromForm] string? encarregat = null
         )
         {
-            var fail = RequireProfileAndSelectDb(out var profile);
-            if (fail != null) return fail;
-
             if (string.IsNullOrWhiteSpace(cardCode))
                 return BadRequest(new { error = "MISSING_CARDCODE" });
 
@@ -80,9 +69,6 @@ namespace XNDmjApi.Controllers.IntranetSetup
             [FromForm] string? encarregat = null
         )
         {
-            var fail = RequireProfileAndSelectDb(out var profile);
-            if (fail != null) return fail;
-
             if (string.IsNullOrWhiteSpace(cardCode))
                 return BadRequest(new { error = "MISSING_CARDCODE" });
 
@@ -106,9 +92,6 @@ namespace XNDmjApi.Controllers.IntranetSetup
         [HttpPost("SetActive")]
         public IActionResult SetActive([FromForm] string cardCode, [FromForm] int code, [FromForm] string actiu)
         {
-            var fail = RequireProfileAndSelectDb(out var profile);
-            if (fail != null) return fail;
-
             if (string.IsNullOrWhiteSpace(cardCode))
                 return BadRequest(new { error = "MISSING_CARDCODE" });
 
@@ -119,74 +102,6 @@ namespace XNDmjApi.Controllers.IntranetSetup
             var svc = new IntranetSetupOperarisService();
             var json = svc.SetActive(cardCode.Trim(), code, a);
             return Content(json, "application/json");
-        }
-
-
-        // =====================================================================
-        // Helper central: Perfil + Selecció de BD (mateix patró que ItemsController)
-        // ---------------------------------------------------------------------
-        // Ús a cada endpoint:
-        // var fail = RequireProfileAndSelectDb(out var profile);
-        // if (fail != null) return fail;
-        //
-        // Depèn de:
-        // - ApiKeyProfileMiddleware (middleware) resol el perfil i el posa a:
-        //   HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey]
-        // - ApiKeyProfile.CompanyDb és el selector de DB (PROD/TEST)
-        //
-        // IMPORTANT: Dades.* és estàtic/global ? risc en concurrència amb perfils diferents.
-        // NO es toca ara: només repliquem el patró existent.
-        // =====================================================================
-        private ActionResult? RequireProfileAndSelectDb(out ApiKeyProfile? profile)
-        {
-            // 1) Recupera perfil resolt pel middleware
-            profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
-            if (profile == null)
-            {
-                return Unauthorized(new
-                {
-                    ok = false,
-                    code = "MISSING_PROFILE",
-                    message = "Falta perfil (ProfileApiKey o X-Api-Key)."
-                });
-            }
-
-            // 2) CompanyDb és el "selector" de la BD
-            var db = (profile.CompanyDb ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(db))
-            {
-                return StatusCode(500, new
-                {
-                    ok = false,
-                    code = "DB_CONTEXT_MISSING",
-                    message = "El perfil no porta CompanyDb."
-                });
-            }
-
-            // 3) Inicialitza / canvia DB context abans de cridar serveis SQL
-            try
-            {
-                // Recalcula només si cal:
-                // - si canvia el DB
-                // - o si encara no tenim ConnectionStringDOMENJO
-                if (!string.Equals(Dades.DOMENJO_BBDD ?? "", db, StringComparison.OrdinalIgnoreCase) ||
-                    string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
-                {
-                    Dades.DOMENJO_BBDD = db;
-                    Dades.SetupDades();
-                }
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new
-                {
-                    ok = false,
-                    code = "DB_SELECT_FAILED",
-                    message = ex.Message
-                });
-            }
-
-            return null; // OK
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Newtonsoft.Json;
 using SAPbobsCOM;
@@ -17,8 +17,6 @@ namespace XNDmjApi.Controllers
     [ApiController]
     public class LoginController : ControllerBase
     {
-        
-
         Funcions Funcions = new Funcions();
 
         // Funció inhabilitada ja que aquesta funció s'ha de fer al costat del client
@@ -115,6 +113,40 @@ namespace XNDmjApi.Controllers
                 return Ok(resultado);
             else
                 return BadRequest(resultado);
+        }
+
+        [HttpPost("resetPasswordByToken")]
+        public ActionResult ResetPasswordByToken([FromForm] string resetToken)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(resetToken))
+                    return BadRequest(new { ok = false, code = "MISSING_TOKEN", message = "Falta resetToken." });
+
+                Login login = new Login();
+                string r = login.ResetPasswordByToken(resetToken);
+
+                if (r == "OK")
+                    return Ok(new { ok = true });
+
+                if (r == "TOKEN_EXPIRED")
+                    return BadRequest(new { ok = false, code = "TOKEN_EXPIRED", message = "El token ha caducat." });
+
+                if (r == "TOKEN_INVALID")
+                    return BadRequest(new { ok = false, code = "TOKEN_INVALID", message = "Token invàlid." });
+
+                if (r == "USER_NOT_FOUND")
+                    return NotFound(new { ok = false, code = "USER_NOT_FOUND", message = "Usuari no trobat." });
+
+                if (r == "DB_CONTEXT_MISSING")
+                    return StatusCode(500, new { ok = false, code = "DB_CONTEXT_MISSING", message = "Falta context de DB." });
+
+                return BadRequest(new { ok = false, code = "RESET_FAILED", message = r });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { ok = false, code = "EXCEPTION", message = ex.Message });
+            }
         }
 
         [HttpPost("getUserInfo")]

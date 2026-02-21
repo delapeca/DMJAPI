@@ -5,6 +5,19 @@ using XNDmjApi.Services;
 
 namespace XNDmjApi.Controllers
 {
+public sealed class ChangeRequestApplyRequest
+{
+    public string? RequestRef { get; set; }
+    public string? CardCode { get; set; }
+}
+    public sealed class ChangeRequestSetLineStatusRequest
+    {
+        public string? CardCode { get; set; }
+        public string? Code { get; set; }
+        public int LineId { get; set; }
+        public string? LineStatus { get; set; }
+    }
+
     [ApiController]
     [Route("api/[controller]")]
     public sealed class SapChangeRequestsUdoController : ControllerBase
@@ -89,6 +102,67 @@ namespace XNDmjApi.Controllers
 
             return Ok(data);
         }
-}
+        [HttpPost("set-line-status")]
+        public IActionResult SetLineStatus([FromBody] ChangeRequestSetLineStatusRequest req)
+        {
+            var profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+                return Unauthorized(new { ok = false, code = "MISSING_PROFILE", message = "Falta perfil (ProfileApiKey / X-Api-Key)." });
+
+            if (req == null)
+                return BadRequest(new { ok = false, code = "MISSING_BODY", message = "Falta body." });
+
+            var cardCode = (req.CardCode ?? "").Trim();
+            var code = (req.Code ?? "").Trim();
+            var lineStatus = (req.LineStatus ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(cardCode))
+                return BadRequest(new { ok = false, code = "MISSING_CARDCODE", message = "Falta cardCode." });
+
+            if (string.IsNullOrWhiteSpace(code))
+                return BadRequest(new { ok = false, code = "MISSING_CODE", message = "Falta code." });
+
+            var (ok, c, m) = _svc.SetLineStatus(profile, cardCode, code, req.LineId, lineStatus);
+
+            if (!ok && (c == "NOT_FOUND" || c == "LINE_NOT_FOUND"))
+                return NotFound(new { ok = false, code = c, message = m });
+
+            if (!ok && (c == "INVALID_STATUS" || c == "INVALID_LINEID" || c == "MISSING_CARDCODE" || c == "MISSING_CODE"))
+                return BadRequest(new { ok = false, code = c, message = m });
+
+            if (!ok)
+                return BadRequest(new { ok = false, code = c, message = m });
+
+            return Ok(new { ok = true, code = c, message = m });
+        }
+
+    
+        [HttpPost("apply")]
+        public IActionResult Apply([FromBody] ChangeRequestApplyRequest req)
+        {
+            var profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+                return Unauthorized(new { ok = false, code = "MISSING_PROFILE", message = "Falta perfil (ProfileApiKey / X-Api-Key)." });
+
+            if (req == null)
+                return BadRequest(new { ok = false, code = "MISSING_BODY", message = "Falta body." });
+
+            var requestRef = (req.RequestRef ?? "").Trim();
+            var cardCode = (req.CardCode ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(requestRef))
+                return BadRequest(new { ok = false, code = "MISSING_REQUESTREF", message = "Falta requestRef." });
+
+            // cardCode és opcional, però si el passes, fem match al service
+            var (ok, c, m) = _svc.Apply(profile, requestRef, string.IsNullOrWhiteSpace(cardCode) ? null : cardCode);
+
+            if (!ok)
+                return BadRequest(new { ok = false, code = c, message = m });
+
+            return Ok(new { ok = true, code = c, message = m });
+        }
+
+
+    }
 }
 

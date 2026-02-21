@@ -1,22 +1,18 @@
-// ============================================================
-// DOMENJ� � DMJAPI � Program.cs
+﻿// ============================================================
+// DOMENJÓ · DMJAPI · Program.cs
 // NOTES (canvis fets per mi):
 //   - 2026-02-06: Swagger OperationFilter (AddPerEndpointApiKeyHeaderParameter)
-//     -> ClientsSelf passa de "AdminApiKey" a "ProfileApiKey" (NOM�S documentaci�/UI).
-//     -> El comportament real d�auth/selecci� de DB el fa el middleware ApiKeyProfileMiddleware.
-//   - He deixat el codi antic COMENTAT al lloc on tocava i he indicat per quin l�he substitu�t.
-//   - He afegit comentaris explicant la funci� de cada bloc.
-//
-// NOTES (canvi addicional 2026-02-10 per Obres/Operaris):
-//   - IsAdminController() inclo�a Obres i Operaris, aix� feia que Swagger els mostr�s com AdminApiKey.
-//   - Ara Obres i Operaris queden NOM�S a IsProfileController() perqu� a Swagger surti ProfileApiKey.
+//     -> ClientsSelf passa de "AdminApiKey" a "ProfileApiKey" (NOMÉS documentació/UI).
+//     -> El comportament real d’auth/selecció de DB el fa el middleware ApiKeyProfileMiddleware.
+//   - He deixat el codi antic COMENTAT al lloc on tocava i he indicat per quin l’he substituït.
+//   - He afegit comentaris explicant la funció de cada bloc.
 // ============================================================
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;           // (actualment no s�est� usant expl�citament aqu�, per� es mant�)
+using Microsoft.AspNetCore.Authentication.JwtBearer;           // (actualment no s’està usant explícitament aquí, però es manté)
 using Microsoft.EntityFrameworkCore;                           // EF Core (SQLite per qrloxone.db)
 using Microsoft.Extensions.DependencyInjection;                // DI container
 using Microsoft.Extensions.Options;                            // IOptions<T>
-using Microsoft.IdentityModel.Tokens;                          // (no s�est� usant expl�citament aqu�, per� es mant�)
+using Microsoft.IdentityModel.Tokens;                          // (no s’està usant explícitament aquí, però es manté)
 using Swashbuckle.AspNetCore.SwaggerGen;                       // Swagger + IOperationFilter
 using System.Net.Http.Headers;                                 // Authorization header pel HttpClient de Loxone
 using System.Text;                                             // Base64
@@ -31,7 +27,7 @@ using XNDmjApi.Models;                                         // ApplicationSet
 using XNDmjApi.QrMulti.Services;                               // QrMultiDbInitializer
 using XNDmjApi.Services;                                       // Serveis API (CustomerPortfolioService, etc.)
 
-// IMPORTANT: en el teu setup, aquest �s el model que compila
+// IMPORTANT: en el teu setup, aquest és el model que compila
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,21 +42,21 @@ builder.Services.AddEndpointsApiExplorer();
 // ============================================================
 // [2] Swagger / OpenAPI
 // ============================================================
-// Swagger aqu� �s principalment per documentaci� i proves via UI.
-// IMPORTANT: Les definicions de "SecurityDefinition" NO imposen auth real, nom�s serveixen per UI/documentaci�.
+// Swagger aquí és principalment per documentació i proves via UI.
+// IMPORTANT: Les definicions de "SecurityDefinition" NO imposen auth real, només serveixen per UI/documentació.
 builder.Services.AddSwaggerGen(c =>
 {
-    // Evita col�lisions de noms en esquemes (molt �til quan hi ha DTOs amb mateix nom en namespaces diferents)
+    // Evita col·lisions de noms en esquemes (molt útil quan hi ha DTOs amb mateix nom en namespaces diferents)
     c.CustomSchemaIds(t => t.FullName ?? t.Name);
 
-    // Suport de c�rrega d'arxius (IFormFile) a Swagger (model Microsoft.OpenApi)
+    // Suport de càrrega d'arxius (IFormFile) a Swagger (model Microsoft.OpenApi)
     c.MapType<IFormFile>(() => new OpenApiSchema
     {
         Type = JsonSchemaType.String,
         Format = "binary"
     });
 
-    // --- Definicions d'API Keys (documentaci�/UI) ---
+    // --- Definicions d'API Keys (documentació/UI) ---
     c.AddSecurityDefinition("AdminApiKey", new OpenApiSecurityScheme
     {
         Description = "Admin API Key (header AdminApiKey).",
@@ -77,21 +73,21 @@ builder.Services.AddSwaggerGen(c =>
         Type = SecuritySchemeType.ApiKey
     });
 
-    // Header nom�s als endpoints que toca (no global).
-    // Aix� afegeix el camp a Swagger per operar amb "Authorize"/headers, per� NO aplica auth real.
+    // Header només als endpoints que toca (no global).
+    // Això afegeix el camp a Swagger per operar amb "Authorize"/headers, però NO aplica auth real.
     c.OperationFilter<AddPerEndpointApiKeyHeaderParameter>();
 });
 
 // ============================================================
 // [3] Config base "BBDD" -> ApplicationSettings
 // ============================================================
-// Carrega configuraci� de BBDD (servidor SQL, user/pwd, etc.) a ApplicationSettings (est�tic).
+// Carrega configuració de BBDD (servidor SQL, user/pwd, etc.) a ApplicationSettings (estàtic).
 builder.Configuration.GetSection("BBDD").Get<ApplicationSettings>();
 
 // ============================================================
 // [4] CORS
 // ============================================================
-// Permet CORS (m�s avall definim AllowAnyHeader/AllowAnyMethod/origins "*").
+// Permet CORS (més avall definim AllowAnyHeader/AllowAnyMethod/origins "*").
 builder.Services.AddCors();
 
 // ============================================================
@@ -102,22 +98,22 @@ builder.Services.AddCors();
 builder.Services.AddScoped<CustomerPortfolioService>();
 
 // ============================================================
-// [6] LOXONE � Options + serveis + DB SQLite
+// [6] LOXONE · Options + serveis + DB SQLite
 // ============================================================
 
-// Options (config) per Loxone, Admin, TokenPolicy, migracions i perfils d�ApiKey
+// Options (config) per Loxone, Admin, TokenPolicy, migracions i perfils d’ApiKey
 builder.Services.Configure<LoxoneOptions>(builder.Configuration.GetSection("Loxone"));
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection("Admin"));
 builder.Services.Configure<TokenPolicyOptions>(builder.Configuration.GetSection("TokenPolicy"));
 builder.Services.Configure<DbMigrationsOptions>(builder.Configuration.GetSection("DbMigrations"));
 
-// ApiKeyProfiles (per Prod/Test) - aix� alimenta el middleware de perfil
+// ApiKeyProfiles (per Prod/Test) - això alimenta el middleware de perfil
 builder.Services.Configure<XNDmjApi.Infrastructure.ApiKeys.ApiKeyProfilesOptions>(builder.Configuration.GetSection("ApiKeyProfiles"));
 
 // [NOU] Config per ApiKeyProfilesMiddleware (namespace Infrastructure.Options)
 //builder.Services.Configure<XNDmjApi.Infrastructure.Options.ApiKeyProfilesOptions>(builder.Configuration.GetSection("ApiKeyProfiles"));
 
-// Serveis espec�fics
+// Serveis específics
 builder.Services.AddScoped<XNDmjApi.Services.SapChangeRequestsUdoService>();
 
 // Inicialitzadors/migracions (SQLite)
@@ -170,7 +166,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ============================================================
-// [9] Middleware d�excepcions (JSON) - el tens especialitzat per alguns endpoints
+// [9] Middleware d’excepcions (JSON) - el tens especialitzat per alguns endpoints
 // ============================================================
 app.UseMiddleware<ApiExceptionJsonMiddleware>();
 
@@ -183,16 +179,12 @@ app.UseSwaggerUI(c =>
 {
     // Manté l’autorització (headers) a la UI entre refreshos
     c.ConfigObject.AdditionalItems["persistAuthorization"] = "true";
-
-    // UI sota /SWAGGER
-    c.RoutePrefix = "SWAGGER";
-
-    // Swagger JSON estàndard
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "XNDmjApi v1");
+    // Sense interceptors (en el teu cas no s'aplicaven)
 });
 
 // ============================================================
-// [11] HTTPS redirection (si est� configurat)
+// [11] HTTPS redirection (si està configurat)
 // ============================================================
 app.UseHttpsRedirection();
 
@@ -213,18 +205,18 @@ app.UseCors(options =>
            .AllowAnyMethod());
 
 // ============================================================
-// [14] Middleware propi: resoluci� de perfil per ApiKey (ProfileApiKey / fallback)
+// [14] Middleware propi: resolució de perfil per ApiKey (ProfileApiKey / fallback)
 // ============================================================
 // ANTIC (comentari original):
-//   // X-Api-Key ? perfil (PROD/TEST) � nom�s per /api/SapChangeRequestsUdo
+//   // X-Api-Key → perfil (PROD/TEST) · només per /api/SapChangeRequestsUdo
 //
-// SUBSTITU�T PER (nota):
-//   Ara el middleware pot aplicar-se tamb� a /api/clients/self (segons la seva l�gica interna).
-//   El comportament real dep�n del fitxer ApiKeyProfileMiddleware.
+// SUBSTITUÏT PER (nota):
+//   Ara el middleware pot aplicar-se també a /api/clients/self (segons la seva lògica interna).
+//   El comportament real depèn del fitxer ApiKeyProfileMiddleware.
 app.UseMiddleware<XNDmjApi.Infrastructure.ApiKeys.ApiKeyProfileMiddleware>();
 //app.UseMiddleware<XNDmjApi.Infrastructure.Middleware.ApiKeyProfilesMiddleware>();
 
-// [NOU] Middleware de migraci�: ProfileApiKey (primary) + X-Api-Key (fallback)
+// [NOU] Middleware de migració: ProfileApiKey (primary) + X-Api-Key (fallback)
 // i aplica a /api/SapChangeRequestsUdo i /api/clients/self (segons el teu fitxer)
 //app.UseMiddleware<XNDmjApi.Infrastructure.Middleware.ApiKeyProfilesMiddleware>();
 
@@ -237,18 +229,18 @@ app.Run();
 // ============================================================
 // [16] Swagger OperationFilter (per afegir headers segons controller)
 // ============================================================
-// Aquest filtre NO aplica seguretat real. Nom�s "pinta" el header a Swagger UI
-// per tal que puguis provar f�cilment els endpoints amb el header correcte.
+// Aquest filtre NO aplica seguretat real. Només "pinta" el header a Swagger UI
+// per tal que puguis provar fàcilment els endpoints amb el header correcte.
 
 class AddPerEndpointApiKeyHeaderParameter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        // Assegura llista de par�metres
+        // Assegura llista de paràmetres
         if (operation.Parameters == null)
             operation.Parameters = new List<IOpenApiParameter>();
 
-        // Detecta controller (forma est�ndard a ASP.NET Core)
+        // Detecta controller (forma estàndard a ASP.NET Core)
         var ctrl =
             context.ApiDescription.ActionDescriptor.RouteValues.TryGetValue("controller", out var c)
                 ? c
@@ -263,7 +255,7 @@ class AddPerEndpointApiKeyHeaderParameter : IOperationFilter
             AddHeaderIfMissing(
                 operation,
                 "AdminApiKey",
-                "Admin API Key per endpoints admin (temporalment tamb� pot existir X-Api-Key al backend)."
+                "Admin API Key per endpoints admin (temporalment també pot existir X-Api-Key al backend)."
             );
             return;
         }
@@ -274,7 +266,7 @@ class AddPerEndpointApiKeyHeaderParameter : IOperationFilter
             AddHeaderIfMissing(
                 operation,
                 "ProfileApiKey",
-                "Profile API Key per endpoints de perfil (temporalment tamb� pot existir X-Api-Key al backend)."
+                "Profile API Key per endpoints de perfil (temporalment també pot existir X-Api-Key al backend)."
             );
             return;
         }
@@ -286,16 +278,18 @@ class AddPerEndpointApiKeyHeaderParameter : IOperationFilter
         // QRController, QrMultiAdminController, QrResolveController
         //
         // NOTE (DMJ) 2026-02-06:
-        //   He canviat aquest m�tode per TREURE "ClientsSelf" d�Admin i passar-lo a Profile.
+        //   He canviat aquest mètode per TREURE "ClientsSelf" d’Admin i passar-lo a Profile.
         //
-        // NOTE (DMJ) 2026-02-10:
-        //   Trets "Obres" i "Operaris" d�Admin perqu� Swagger els mostri com ProfileApiKey.
+        // --- CODI ANTIC (comentat) ---
+        // return controllerName.Equals("QR", StringComparison.OrdinalIgnoreCase)
+        //     || controllerName.Equals("QrMultiAdmin", StringComparison.OrdinalIgnoreCase)
+        //     || controllerName.Equals("QrResolve", StringComparison.OrdinalIgnoreCase)
+        //     || controllerName.Equals("ClientsSelf", StringComparison.OrdinalIgnoreCase);
         //
-        // --- SUBSTITU�T PER (nou) ---
+        // --- SUBSTITUÏT PER (nou) ---
         return controllerName.Equals("QR", StringComparison.OrdinalIgnoreCase)
             || controllerName.Equals("QrMultiAdmin", StringComparison.OrdinalIgnoreCase)
             || controllerName.Equals("QrResolve", StringComparison.OrdinalIgnoreCase);
-            
     }
 
     private static bool IsProfileController(string controllerName)
@@ -303,29 +297,24 @@ class AddPerEndpointApiKeyHeaderParameter : IOperationFilter
         // Controllers que van amb ProfileApiKey (ApiKeyProfiles -> perfil Prod/Test)
         //
         // NOTE (DMJ) 2026-02-06:
-        //   He afegit "ClientsSelf" aqu� perqu� Swagger indiqui ProfileApiKey en lloc d�AdminApiKey.
+        //   He afegit "ClientsSelf" aquí perquè Swagger indiqui ProfileApiKey en lloc d’AdminApiKey.
         //
-        // --- SUBSTITU�T PER (nou) ---
+        // --- CODI ANTIC (comentat) ---
+        // return controllerName.Equals("SapChangeRequestsUdo", StringComparison.OrdinalIgnoreCase);
+        //
+        // --- SUBSTITUÏT PER (nou) ---
         return controllerName.Equals("SapChangeRequestsUdo", StringComparison.OrdinalIgnoreCase)
             || controllerName.Equals("ClientsSelf", StringComparison.OrdinalIgnoreCase)
+            // [DMJ] 2026-02-08 — NOU (només Swagger UI):
             || controllerName.Equals("Items", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesOffers", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesOrders", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesDeliveryNotes", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesReturns", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesInvoices", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesCreditNotes", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("Obres", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("Operaris", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesDeliveryNotes", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesReturns", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesInvoices", StringComparison.OrdinalIgnoreCase)
-            || controllerName.Equals("SalesCreditNotes", StringComparison.OrdinalIgnoreCase);
+            // ⬅️ AFEGIR AQUESTES 2 LÍNIES
+            // [DMJ] 2026-02-10 — NOU (només Swagger UI):
+            || controllerName.Equals("SalesOrders", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AddHeaderIfMissing(OpenApiOperation operation, string headerName, string description)
     {
-        // Evita duplicats: si ja existeix el param headerName, no l�afegeix.
+        // Evita duplicats: si ja existeix el param headerName, no l’afegeix.
         foreach (var p in operation.Parameters)
         {
             if (string.Equals(p.Name, headerName, StringComparison.OrdinalIgnoreCase) &&
@@ -333,7 +322,7 @@ class AddPerEndpointApiKeyHeaderParameter : IOperationFilter
                 return;
         }
 
-        // Afegeix el par�metre com a Header al Swagger UI
+        // Afegeix el paràmetre com a Header al Swagger UI
         operation.Parameters.Add(new OpenApiParameter
         {
             Name = headerName,

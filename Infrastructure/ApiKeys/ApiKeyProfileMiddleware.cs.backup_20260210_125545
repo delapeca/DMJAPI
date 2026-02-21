@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using System;
 using System.Security.Cryptography;
@@ -13,12 +13,12 @@ namespace XNDmjApi.Infrastructure.ApiKeys
     /// Objectiu:
     ///   - Llegir la API key d'entrada (preferent: ProfileApiKey; fallback: X-Api-Key i variants)
     ///   - Resoldre el perfil (CompanyDb + SapUser + SapPassword) des de ApiKeyProfilesOptions.Profiles
-    ///   - Deixar-lo a HttpContext.Items[HttpContextItemKey] perqu� Controllers/Services decideixin BD/credencials
+    ///   - Deixar-lo a HttpContext.Items[HttpContextItemKey] perquè Controllers/Services decideixin BD/credencials
     ///
     /// IMPORTANT:
-    ///   - Aquest middleware NOM�S s'aplica a certs prefixos de ruta.
+    ///   - Aquest middleware NOMÉS s'aplica a certs prefixos de ruta.
     ///   - Afegir nous endpoints "profile-scoped" = afegir un nou StartsWithSegments(...) a isProfileScoped.
-    ///   - No cal tocar la l�gica de resoluci� de perfils.
+    ///   - No cal tocar la lògica de resolució de perfils.
     /// </summary>
     public sealed class ApiKeyProfileMiddleware
     {
@@ -34,12 +34,12 @@ namespace XNDmjApi.Infrastructure.ApiKeys
             _opt = opt?.Value ?? new ApiKeyProfilesOptions();
         }
 
-        // -------------------------------------------------------------
+        // ─────────────────────────────────────────────────────────────
         // RUTES "PROFILE-SCOPED"
-        // -------------------------------------------------------------
-        // ? Afegir nous endpoints protegits per ProfileApiKey:
-        //    - AFEGEIX el prefix aqu� (una l�nia)
-        //    - NO toquis la resta de la l�gica del middleware
+        // ─────────────────────────────────────────────────────────────
+        // ✅ Afegir nous endpoints protegits per ProfileApiKey:
+        //    - AFEGEIX el prefix aquí (una línia)
+        //    - NO toquis la resta de la lògica del middleware
         private static readonly string[] ProfileScopedPrefixes = new[]
         {
             "/api/SapChangeRequestsUdo",
@@ -47,15 +47,12 @@ namespace XNDmjApi.Infrastructure.ApiKeys
             "/api/Login/RequestPasswordReset",
             "/api/Login/ResetPasswordByToken",
             "/api/Login/ResetPassword",
+
+            // [DMJ] 2026-02-08 — NOU:
+            // Tot /api/Items/* ha de seleccionar BBDD segons ProfileApiKey (prod/test)
             "/api/Items",
             "/api/SalesOffers",
             "/api/SalesOrders",
-            "/api/SalesDeliveryNotes",
-            "/api/SalesReturns",
-            "/api/SalesInvoices",
-            "/api/SalesCreditNotes",
-            "/api/intranetSetup/Obres",
-            "/api/intranetSetup/Operaris",
         };
 
         private static bool AppliesToPath(PathString path)
@@ -73,13 +70,13 @@ namespace XNDmjApi.Infrastructure.ApiKeys
         {
             if (ctx == null) { await _next(ctx!); return; }
 
-            // -------------------------------------------------------------
+            // ─────────────────────────────────────────────────────────────
             // PAS 0) Decideix si aquest middleware aplica a la request actual
-            // -------------------------------------------------------------
+            // ─────────────────────────────────────────────────────────────
             var path = ctx.Request.Path;
 
             // --- CODI ANTIC (ABANS) ---
-            // IMPORTANT: abans nom�s aplicava a SapChangeRequestsUdo
+            // IMPORTANT: abans només aplicava a SapChangeRequestsUdo
             // if (!path.StartsWithSegments("/api/SapChangeRequestsUdo", StringComparison.OrdinalIgnoreCase))
             // {
             //     await _next(ctx);
@@ -87,7 +84,7 @@ namespace XNDmjApi.Infrastructure.ApiKeys
             // }
 
             // --- CODI NOU (ARA) ---
-            // Afegim /api/clients/self perqu� aquests endpoints tamb� necessiten perfil + selecci� de DB.
+            // Afegim /api/clients/self perquè aquests endpoints també necessiten perfil + selecció de DB.
             // (i mantenim els altres que ja tenies)
             if (!AppliesToPath(path))
             {
@@ -96,9 +93,9 @@ namespace XNDmjApi.Infrastructure.ApiKeys
             }
 
 
-            // -------------------------------------------------------------
-            // PAS 1) Validar que la configuraci� de perfils existeix
-            // -------------------------------------------------------------
+            // ─────────────────────────────────────────────────────────────
+            // PAS 1) Validar que la configuració de perfils existeix
+            // ─────────────────────────────────────────────────────────────
             // Necessitem: ApiKeyProfilesOptions.Profiles["prod|test|..."] amb ApiKey/CompanyDb/SapUser/SapPassword
             if (_opt.Profiles == null || _opt.Profiles.Count == 0)
             {
@@ -112,13 +109,13 @@ namespace XNDmjApi.Infrastructure.ApiKeys
                 return;
             }
 
-            // -------------------------------------------------------------
+            // ─────────────────────────────────────────────────────────────
             // PAS 2) Llegir la key entrant (preferent ProfileApiKey; fallback legacy)
-            // -------------------------------------------------------------
+            // ─────────────────────────────────────────────────────────────
             // Ordre:
             //   1) Header ProfileApiKey            (nou)
             //   2) Header X-Api-Key / X-API-Key... (legacy)
-            //   3) Authorization: Bearer <key>     (extra compat, opcional per� �til)
+            //   3) Authorization: Bearer <key>     (extra compat, opcional però útil)
             string incoming = "";
 
             if (TryGetHeader(ctx, "ProfileApiKey", out incoming))
@@ -147,14 +144,14 @@ namespace XNDmjApi.Infrastructure.ApiKeys
                 {
                     ok = false,
                     code = "MISSING_API_KEY",
-                    message = "Falta header ProfileApiKey (o X-Api-Key durant la transici�)."
+                    message = "Falta header ProfileApiKey (o X-Api-Key durant la transició)."
                 });
                 return;
             }
 
-            // -------------------------------------------------------------
-            // PAS 3) Resoldre el perfil segons la key (comparaci� en temps constant)
-            // -------------------------------------------------------------
+            // ─────────────────────────────────────────────────────────────
+            // PAS 3) Resoldre el perfil segons la key (comparació en temps constant)
+            // ─────────────────────────────────────────────────────────────
             var prof = ResolveProfile(incoming);
             if (prof == null)
             {
@@ -168,20 +165,20 @@ namespace XNDmjApi.Infrastructure.ApiKeys
                 return;
             }
 
-            // -------------------------------------------------------------
-            // PAS 4) Guardar el perfil perqu� el controller el pugui consumir
-            // -------------------------------------------------------------
+            // ─────────────────────────────────────────────────────────────
+            // PAS 4) Guardar el perfil perquè el controller el pugui consumir
+            // ─────────────────────────────────────────────────────────────
             // Exemple al controller:
             //   var profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
-            //   ... i a partir d'aqu� selecciones DB / credencials.
+            //   ... i a partir d'aquí selecciones DB / credencials.
             ctx.Items[HttpContextItemKey] = prof;
 
             await _next(ctx);
         }
 
-        // -------------------------------------------------------------
+        // ─────────────────────────────────────────────────────────────
         // Helpers
-        // -------------------------------------------------------------
+        // ─────────────────────────────────────────────────────────────
 
         private ApiKeyProfile? ResolveProfile(string incoming)
         {

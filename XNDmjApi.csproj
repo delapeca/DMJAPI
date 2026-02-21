@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>AnyCPU;x86</Platforms>
+    <UserSecretsId>2863fda3-e952-4f79-a1c6-ba4b4223e42a</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -78,7 +79,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Querys\GetItemsSalesPrices.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Querys\GetItemsSubGroups.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

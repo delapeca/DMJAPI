@@ -4,6 +4,7 @@ using System;
 using System.Globalization;
 using XNDmjApi.Services;
 using XNDmjApi.Functions;
+using XNDmjApi.Infrastructure.ApiKeys;  // ⬅️ NOU
 
 namespace XNDmjApi.Controllers
 {
@@ -27,12 +28,16 @@ namespace XNDmjApi.Controllers
         ///   numAtCard = ref. client (ORDR.NumAtCard, amb LIKE) [opcional]
         ///
         /// Regles:
-        ///   - Si arriba "year", agafem tot l’exercici.
+        ///   - Si arriba "year", agafem tot l'exercici.
         ///   - Si NO hi ha "year", exigim fromDate + toDate.
         /// </summary>
         [HttpPost("GetSalesOrdersSummary")]
-        public ActionResult GetSalesOrdersSummary([FromForm] string cardCode,[FromForm] string year = "",[FromForm] string fromDate = "",[FromForm] string toDate = "",[FromForm] string status = "%",[FromForm] string docNum = "",[FromForm] string numAtCard = "")
+        public ActionResult GetSalesOrdersSummary([FromForm] string cardCode, [FromForm] string year = "", [FromForm] string fromDate = "", [FromForm] string toDate = "", [FromForm] string status = "%", [FromForm] string docNum = "", [FromForm] string numAtCard = "")
         {
+            // ⬅️ NOU: Validació de perfil i selecció de BD
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             if (string.IsNullOrWhiteSpace(cardCode))
             {
                 return BadRequest("Falta el CardCode.");
@@ -87,7 +92,7 @@ namespace XNDmjApi.Controllers
             if (jsonResult == null)
                 return BadRequest("Error generant el JSON.");
 
-            // Retorna el JSON “en brut” (array/object), no un string serialitzat
+            // Retorna el JSON "en brut" (array/object), no un string serialitzat
             return Content(jsonResult, "application/json");
 
         }
@@ -95,6 +100,10 @@ namespace XNDmjApi.Controllers
         [HttpPost("GetSalesOrderDetail")]
         public ActionResult GetSalesOrderDetail([FromForm] string cardCode, [FromForm] int docEntry)
         {
+            // ⬅️ NOU: Validació de perfil i selecció de BD
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             if (string.IsNullOrWhiteSpace(cardCode))
                 return BadRequest("Falta cardCode.");
 
@@ -107,5 +116,71 @@ namespace XNDmjApi.Controllers
             return Ok(jsonResult);
         }
 
+        // =====================================================================
+        // Helper central: Perfil + Selecció de BD (mateix patró que ItemsController)
+        // ---------------------------------------------------------------------
+        // Ús a cada endpoint de SalesOrders:
+        // var fail = RequireProfileAndSelectDb(out var profile);
+        // if (fail != null) return fail;
+        //
+        // Depèn de:
+        // - ApiKeyProfileMiddleware (middleware) resol el perfil i el posa a:
+        //   HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey]
+        // - ApiKeyProfile.CompanyDb és el selector de DB (PROD/TEST)
+        //
+        // IMPORTANT: Dades.* és estàtic/global → risc en concurrència amb perfils diferents.
+        // NO es toca ara: només repliquem el patró existent.
+        // =====================================================================
+        private ActionResult? RequireProfileAndSelectDb(out ApiKeyProfile? profile)
+        {
+            // 1) Recupera perfil resolt pel middleware
+            profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+            {
+                return Unauthorized(new
+                {
+                    ok = false,
+                    code = "MISSING_PROFILE",
+                    message = "Falta perfil (ProfileApiKey o X-Api-Key)."
+                });
+            }
+
+            // 2) CompanyDb és el "selector" de la BD
+            var db = (profile.CompanyDb ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(db))
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_CONTEXT_MISSING",
+                    message = "El perfil no porta CompanyDb."
+                });
+            }
+
+            // 3) Inicialitza / canvia DB context abans de cridar serveis SQL
+            try
+            {
+                // Recalcula només si cal:
+                // - si canvia el DB
+                // - o si encara no tenim ConnectionStringDOMENJO
+                if (!string.Equals(Dades.DOMENJO_BBDD ?? "", db, StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = db;
+                    Dades.SetupDades();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_SELECT_FAILED",
+                    message = ex.Message
+                });
+            }
+
+            return null; // OK
+        }
     }
 }

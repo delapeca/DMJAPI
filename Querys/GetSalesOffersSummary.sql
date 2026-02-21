@@ -32,6 +32,12 @@ SELECT
     Q.DocStatus,   -- 'O' / 'C'
     Q.CANCELED,    -- 'N' / 'Y'
 
+    Q.U_XN_Obra,
+    Q.U_XN_DescObra,
+    Q.U_XN_Operari,
+    Q.U_XN_NomOperari,
+
+
     -- Estat “humà” per a l’extranet
     CASE
         WHEN Q.CANCELED = 'Y' THEN 'Cancelled'

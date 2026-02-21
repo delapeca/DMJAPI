@@ -47,6 +47,11 @@ SELECT
     L.Currency,
     L.DiscPrcnt        AS DiscountPercent, -- % descompte línia
 
+    H.U_XN_Obra,
+    H.U_XN_DescObra,
+    H.U_XN_Operari,
+    H.U_XN_NomOperari,
+
     -- Preu net unitari = Price * (1 - DiscPrcnt/100)
     CAST(
         L.Price * (1 - (ISNULL(L.DiscPrcnt, 0) / 100.0)
@@ -55,8 +60,8 @@ SELECT
     -- Total línia (sense IVA) tal com està a la factura
     L.LineTotal        AS LineTotal
 
-FROM INV1 L               -- línies de factura
-JOIN OINV H
+FROM DLN1 L               -- línies de factura
+JOIN ODLN H
     ON H.DocEntry = L.DocEntry
 JOIN OITM I
     ON I.ItemCode = L.ItemCode

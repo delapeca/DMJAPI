@@ -36,6 +36,12 @@ SELECT
     T0.DocTotal,
     T0.DocStatus,
     T0.CANCELED,
+
+    T0.U_XN_Obra,
+    T0.U_XN_DescObra,
+    T0.U_XN_Operari,
+    T0.U_XN_NomOperari,
+
     CASE
         WHEN ISNULL(T0.CANCELED,'N') = 'Y' THEN 'Cancel·lada'
         WHEN T0.DocStatus = 'C'       THEN 'Tancada'

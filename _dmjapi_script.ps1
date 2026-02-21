@@ -1,139 +1,118 @@
-﻿# =========================
-# DOMENJÓ · DMJAPI Patch · Fase 3 (fallback temporal headers)
-# PowerShell 5.1
-# =========================
-
+﻿#requires -Version 5.1
 $ErrorActionPreference = "Stop"
-Set-StrictMode -Version 2.0
 
-Write-Host "=== DMJAPI · PATCH Fase 3 · AdminApiKey/ProfileApiKey + fallback X-Api-Key ==="
+$ts = Get-Date -Format "yyyyMMdd_HHmmss"
+$outFile = Join-Path (Get-Location) "_dmj_patch_out.txt"
 
-# [0] Recordatori backup (tu ja fas git, però aquest script fa .bak igualment)
-$TS = (Get-Date).ToString("yyyyMMdd_HHmmss")
-
-# --- Helpers ---
-function Assert-File([string]$Path) {
-  if (-not (Test-Path -LiteralPath $Path)) {
-    throw "ERROR: No trobo el fitxer: $Path (executa el script des de l'arrel del projecte)."
-  }
+function Log($s) {
+  $line = "[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $s
+  Write-Host $line
+  Add-Content -Path $outFile -Encoding UTF8 -Value $line
 }
 
-function Backup-File([string]$Path) {
-  $bk = "$Path.bak_$TS"
-  Copy-Item -LiteralPath $Path -Destination $bk -Force
-  Write-Host "Backup: $bk"
+Log "DMJ PATCH: CRQ Apply endpoint (controller) v1"
+Log "RepoRoot: $(Get-Location)"
+
+# 1) Target file
+$CTRL = "Controllers\SapChangeRequestsUdoController.cs"
+if (!(Test-Path $CTRL)) { throw "ERROR: No existeix el fitxer: $CTRL" }
+
+# 2) Backup
+$bak = "$CTRL.bak_$ts"
+Copy-Item -LiteralPath $CTRL -Destination $bak -Force
+Log "Backup: $bak"
+
+# 3) Load file
+$code = Get-Content -LiteralPath $CTRL -Raw -Encoding UTF8
+
+# 4) Guard rails
+if ($code -match '\[HttpPost\("apply"\)\]') {
+  Log "Ja existeix [HttpPost(""apply"")]. No faig res."
+  exit 0
 }
 
-function Replace-Once([string]$Path, [string]$Pattern, [string]$Replacement, [string]$Label) {
-  $s = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-  $rx = New-Object System.Text.RegularExpressions.Regex($Pattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
-  $m = $rx.Matches($s)
-  if ($m.Count -ne 1) {
-    throw "ERROR: [$Label] esperava 1 match a $Path, però n'he trobat $($m.Count). No aplico el patch."
-  }
-  $s2 = $rx.Replace($s, $Replacement, 1)
-  Set-Content -LiteralPath $Path -Value $s2 -Encoding UTF8
-  Write-Host "OK: $Label"
+# 5) Insert Apply request DTO (next to ChangeRequestSetLineStatusRequest)
+$dtoNeedle = "public sealed class ChangeRequestSetLineStatusRequest"
+if ($code -notmatch [regex]::Escape($dtoNeedle)) { throw "ERROR: No trobo ChangeRequestSetLineStatusRequest al controller." }
+
+$applyDto = @"
+public sealed class ChangeRequestApplyRequest
+{
+    public string? RequestRef { get; set; }
+    public string? CardCode { get; set; }
 }
 
-# --- Targets (segons el teu codi) ---
-$files = @(
-  "Controllers\QRController.Loxone.cs",
-  "Controllers\QrMultiAdminController.cs",
-  "Controllers\QrResolveController.cs",
-  "Controllers\IntranetSetup\ClientsSelfController.cs",
-  "Infrastructure\ApiKeys\ApiKeyProfileMiddleware.cs"
+"@
+
+# Inserim just abans de ChangeRequestSetLineStatusRequest
+$code2 = [regex]::Replace(
+  $code,
+  "(\r?\n)(\s*public\s+sealed\s+class\s+ChangeRequestSetLineStatusRequest\s*\r?\n)",
+  "`$1$applyDto`$2",
+  1
 )
 
-Write-Host ""
-Write-Host "[1/4] Validant fitxers..."
-foreach ($f in $files) { Assert-File $f }
+if ($code2 -eq $code) { throw "ERROR: No he pogut inserir ChangeRequestApplyRequest." }
+$code = $code2
 
-Write-Host ""
-Write-Host "[2/4] Backups..."
-foreach ($f in $files) { Backup-File $f }
+# 6) Insert Apply endpoint method inside controller class, after SetLineStatus method
+# Troba el final del mètode SetLineStatus (return Ok...) i el tanca abans del final de classe.
+$applyMethod = @"
 
-Write-Host ""
-Write-Host "[3/4] Aplicant canvis..."
+        [HttpPost(""apply"")]
+        public IActionResult Apply([FromBody] ChangeRequestApplyRequest req)
+        {
+            var profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+                return Unauthorized(new { ok = false, code = ""MISSING_PROFILE"", message = ""Falta perfil (ProfileApiKey / X-Api-Key)."" });
 
-# 3.1 QRController.Loxone.cs · IsAdminAuthorized() -> header preferent AdminApiKey
-Replace-Once `
-  "Controllers\QRController.Loxone.cs" `
-  'var\s+header\s*=\s*Request\.Headers\["X-Api-Key"\]\.FirstOrDefault\(\)\s*\r?\n\s*\?\?\s*Request\.Headers\["X-API-Key"\]\.FirstOrDefault\(\)\s*\r?\n\s*\?\?\s*Request\.Headers\["x-api-key"\]\.FirstOrDefault\(\)\s*;' `
-  'var header = Request.Headers["AdminApiKey"].FirstOrDefault()
-                    ?? Request.Headers["X-Api-Key"].FirstOrDefault()
-                    ?? Request.Headers["X-API-Key"].FirstOrDefault()
-                    ?? Request.Headers["x-api-key"].FirstOrDefault();' `
-  "QRController.Loxone.cs · Admin header fallback"
+            if (req == null)
+                return BadRequest(new { ok = false, code = ""MISSING_BODY"", message = ""Falta body."" });
 
-# 3.2 QrMultiAdminController.cs · IsAdminAuthorized() -> TryGetValue AdminApiKey abans
-Replace-Once `
-  "Controllers\QrMultiAdminController.cs" `
-  'if\s*\(Request\.Headers\.TryGetValue\("X-Api-Key",\s*out\s+var\s+got\)\)\s*\r?\n\s*provided\s*=\s*got\.ToString\(\)\.Trim\(\);\s*\r?\n\s*else\s+if\s*\(Request\.Headers\.TryGetValue\("X-API-Key",\s*out\s+var\s+got2\)\)\s*\r?\n\s*provided\s*=\s*got2\.ToString\(\)\.Trim\(\);\s*' `
-  'if (Request.Headers.TryGetValue("AdminApiKey", out var got0))
-                provided = got0.ToString().Trim();
-            else if (Request.Headers.TryGetValue("X-Api-Key", out var got))
-                provided = got.ToString().Trim();
-            else if (Request.Headers.TryGetValue("X-API-Key", out var got2))
-                provided = got2.ToString().Trim();
-' `
-  "QrMultiAdminController.cs · AdminApiKey preferent"
+            var requestRef = (req.RequestRef ?? """").Trim();
+            var cardCode = (req.CardCode ?? """").Trim();
 
-# 3.3 QrResolveController.cs · TryAuthorizeClientKey() -> TryGetValue AdminApiKey abans
-Replace-Once `
-  "Controllers\QrResolveController.cs" `
-  'if\s*\(Request\.Headers\.TryGetValue\("X-Api-Key",\s*out\s+var\s+apiKeyVal\)\)\s*\r?\n\s*provided\s*=\s*apiKeyVal\.ToString\(\)\.Trim\(\);\s*\r?\n\s*else\s+if\s*\(Request\.Headers\.TryGetValue\("X-API-Key",\s*out\s+var\s+showroomVal\)\)\s*\r?\n\s*provided\s*=\s*showroomVal\.ToString\(\)\.Trim\(\);\s*' `
-  'if (Request.Headers.TryGetValue("AdminApiKey", out var adminVal))
-                provided = adminVal.ToString().Trim();
-            else if (Request.Headers.TryGetValue("X-Api-Key", out var apiKeyVal))
-                provided = apiKeyVal.ToString().Trim();
-            else if (Request.Headers.TryGetValue("X-API-Key", out var showroomVal))
-                provided = showroomVal.ToString().Trim();
-' `
-  "QrResolveController.cs · AdminApiKey preferent"
+            if (string.IsNullOrWhiteSpace(requestRef))
+                return BadRequest(new { ok = false, code = ""MISSING_REQUESTREF"", message = ""Falta requestRef."" });
 
-# 3.4 ClientsSelfController.cs · CheckApiKey() -> afegir AdminApiKey com a primer header
-Replace-Once `
-  "Controllers\IntranetSetup\ClientsSelfController.cs" `
-  'if\s*\(Request\.Headers\.TryGetValue\("X-Api-Key",\s*out\s+var\s+h1\)\)\s*key\s*=\s*h1\.ToString\(\);\s*' `
-  'if (Request.Headers.TryGetValue("AdminApiKey", out var ha)) key = ha.ToString();
-            else if (Request.Headers.TryGetValue("X-Api-Key", out var h1)) key = h1.ToString();' `
-  "ClientsSelfController.cs · AdminApiKey preferent"
+            // cardCode és opcional, però si el passes, fem match al service
+            var (ok, c, m) = _svc.Apply(profile, requestRef, string.IsNullOrWhiteSpace(cardCode) ? null : cardCode);
 
-# 3.5 ApiKeyProfileMiddleware.cs · X-Api-Key -> ProfileApiKey preferent + fallback X-Api-Key
-Replace-Once `
-  "Infrastructure\ApiKeys\ApiKeyProfileMiddleware.cs" `
-  '\/\/\s*Header\s*required\s*\r?\n\s*if\s*\(!ctx\.Request\.Headers\.TryGetValue\("X-Api-Key",\s*out\s+var\s+hv\)\)\s*\r?\n\s*\{\s*\r?\n\s*ctx\.Response\.StatusCode\s*=\s*StatusCodes\.Status401Unauthorized;\s*\r?\n\s*await\s+ctx\.Response\.WriteAsJsonAsync\([^;]*"Falta header X-Api-Key\."[^;]*\);\s*\r?\n\s*return;\s*\r?\n\s*\}\s*\r?\n\s*\r?\n\s*string\s+incoming\s*=\s*\(hv\.ToString\(\)\s*\?\?\s*""\)\.Trim\(\);\s*' `
-  '// Header required (ProfileApiKey preferent; fallback temporal X-Api-Key)
-            string incoming = "";
-            if (ctx.Request.Headers.TryGetValue("ProfileApiKey", out var hvNew))
-                incoming = (hvNew.ToString() ?? "").Trim();
-            else if (ctx.Request.Headers.TryGetValue("X-Api-Key", out var hvOld))
-                incoming = (hvOld.ToString() ?? "").Trim();
+            if (!ok)
+                return BadRequest(new { ok = false, code = c, message = m });
 
-            if (string.IsNullOrWhiteSpace(incoming))
-            {
-                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await ctx.Response.WriteAsJsonAsync(new { ok = false, code = "MISSING_API_KEY", message = "Falta header ProfileApiKey (o X-Api-Key durant la transició)." });
-                return;
-            }
-' `
-  "ApiKeyProfileMiddleware.cs · ProfileApiKey preferent"
+            return Ok(new { ok = true, code = c, message = m });
+        }
 
-Write-Host ""
-Write-Host "[4/4] Build..."
-dotnet build
+"@
 
-Write-Host ""
-Write-Host "=== PATCH OK · Fase 3 completada ==="
-Write-Host "Proves manuals recomanades:"
-Write-Host "  - Admin endpoint amb X-Api-Key (vell) -> OK"
-Write-Host "  - Admin endpoint amb AdminApiKey (nou) -> OK"
-Write-Host "  - Profile endpoint amb X-Api-Key (vell) -> OK"
-Write-Host "  - Profile endpoint amb ProfileApiKey (nou) -> OK"
+# Inserim abans de l'última '}' que tanca la classe controller (la de SapChangeRequestsUdoController),
+# mantenint la '}' final del namespace.
+$code3 = [regex]::Replace(
+  $code,
+  "(\r?\n\s*)}\s*\r?\n}\s*\r?\n\s*$",
+  "`$1$applyMethod`$1}`r`n}`r`n",
+  1
+)
 
+if ($code3 -eq $code) { throw "ERROR: No he pogut inserir el mètode Apply dins la classe." }
+$code = $code3
 
+# 7) Write back
+Set-Content -LiteralPath $CTRL -Value $code -Encoding UTF8
+Log "Patched: $CTRL"
 
+# 8) dotnet build (minimal test)
+Log "Running: dotnet build"
+$build = & dotnet build 2>&1
+$build | ForEach-Object { Add-Content -Path $outFile -Encoding UTF8 -Value $_ }
+if ($LASTEXITCODE -ne 0) {
+  Log "ERROR: dotnet build ha fallat. Reverteix amb el .bak i passa'm el _dmj_patch_out.txt"
+  exit 1
+}
+Log "OK: dotnet build"
+
+Log "DONE"
 
 
 

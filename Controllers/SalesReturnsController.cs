@@ -1,7 +1,9 @@
-ï»¿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Globalization;
 using XNDmjApi.Services;
+using XNDmjApi.Infrastructure.ApiKeys;
+using XNDmjApi.Functions;  // ?? AFEGIT per ProfileApiKey
 
 namespace XNDmjApi.Controllers
 {
@@ -17,6 +19,10 @@ namespace XNDmjApi.Controllers
             [FromForm] string toDate = ""
         )
         {
+            // ?? AFEGIT: Validació de perfil i selecció de BD
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             try
             {
                 DateTime from;
@@ -25,45 +31,16 @@ namespace XNDmjApi.Controllers
                 if (!string.IsNullOrWhiteSpace(year))
                 {
                     int y = int.Parse(year);
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                   from = new DateTime(y, 1, 1);
-                    to   = new DateTime(y, 12, 31);
+                    from = new DateTime(y, 1, 1);
+                    to = new DateTime(y, 12, 31);
                 }
                 else
                 {
                     if (string.IsNullOrWhiteSpace(fromDate) || string.IsNullOrWhiteSpace(toDate))
-                        return BadRequest("fromDate i toDate sÃ³n obligatoris si no s'indica year.");
+                        return BadRequest("fromDate i toDate són obligatoris si no s'indica year.");
 
                     from = DateTime.ParseExact(fromDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-                    to   = DateTime.ParseExact(toDate,   "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    to = DateTime.ParseExact(toDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
                 }
 
                 var svc = new SalesReturnsService();
@@ -74,27 +51,7 @@ namespace XNDmjApi.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-           }
+            }
         }
 
         [HttpPost("GetSalesReturnDetail")]
@@ -103,6 +60,10 @@ namespace XNDmjApi.Controllers
             [FromForm] int docEntry = 0
         )
         {
+            // ?? AFEGIT: Validació de perfil i selecció de BD
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             try
             {
                 var svc = new SalesReturnsService();
@@ -114,6 +75,74 @@ namespace XNDmjApi.Controllers
             {
                 return BadRequest(new { error = ex.Message });
             }
+        }
+
+
+        // =====================================================================
+        // Helper central: Perfil + Selecció de BD (mateix patró que ItemsController)
+        // ---------------------------------------------------------------------
+        // Ús a cada endpoint:
+        // var fail = RequireProfileAndSelectDb(out var profile);
+        // if (fail != null) return fail;
+        //
+        // Depèn de:
+        // - ApiKeyProfileMiddleware (middleware) resol el perfil i el posa a:
+        //   HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey]
+        // - ApiKeyProfile.CompanyDb és el selector de DB (PROD/TEST)
+        //
+        // IMPORTANT: Dades.* és estàtic/global ? risc en concurrència amb perfils diferents.
+        // NO es toca ara: només repliquem el patró existent.
+        // =====================================================================
+        private ActionResult? RequireProfileAndSelectDb(out ApiKeyProfile? profile)
+        {
+            // 1) Recupera perfil resolt pel middleware
+            profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+            {
+                return Unauthorized(new
+                {
+                    ok = false,
+                    code = "MISSING_PROFILE",
+                    message = "Falta perfil (ProfileApiKey o X-Api-Key)."
+                });
+            }
+
+            // 2) CompanyDb és el "selector" de la BD
+            var db = (profile.CompanyDb ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(db))
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_CONTEXT_MISSING",
+                    message = "El perfil no porta CompanyDb."
+                });
+            }
+
+            // 3) Inicialitza / canvia DB context abans de cridar serveis SQL
+            try
+            {
+                // Recalcula només si cal:
+                // - si canvia el DB
+                // - o si encara no tenim ConnectionStringDOMENJO
+                if (!string.Equals(Dades.DOMENJO_BBDD ?? "", db, StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = db;
+                    Dades.SetupDades();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_SELECT_FAILED",
+                    message = ex.Message
+                });
+            }
+
+            return null; // OK
         }
     }
 }

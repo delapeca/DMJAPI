@@ -31,14 +31,18 @@ namespace XNDmjApi.Services
             return DataAccess.GetJSon(Dades.ConnectionStringDOMENJO, query, parametres);
         }
 
-        public string GetSalesDeliveryNoteDetail(string cardCode, int docEntry)
+        public string GetSalesDeliveryNoteDetail(string cardCode, int docEntry, string lineFilter)
         {
-            EnsureConnection();
+            // Validar lineFilter
+            lineFilter = (lineFilter ?? "").Trim().ToUpperInvariant();
+            if (lineFilter != "INVOICED" && lineFilter != "NOT_INVOICED" && lineFilter != "ALL")
+                lineFilter = "ALL";
 
             string[] parametres = new string[]
             {
                 $"CardCode:{cardCode}",
-                $"DocEntry:{docEntry}"
+                $"DocEntry:{docEntry}",
+                $"LineFilter:{lineFilter}"  // ⬅️ NOU
             };
 
             string query = Funcions.GetQuery("GetSalesDeliveryNoteDetail.sql");

@@ -68,6 +68,7 @@ namespace XNDmjApi.Services
 
                     // numèrics → Convert.ToDecimal
                     Price = row["Price"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Price"]),
+                    PriceUnit = row["PriceUnit"] == DBNull.Value ? 0 : Convert.ToInt32(row["PriceUnit"]),
                     Currency = row.Field<string>("Currency"),
                     Discount = row["Discount"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Discount"]),
 
@@ -93,7 +94,11 @@ namespace XNDmjApi.Services
                     UgpEntry = row["UgpEntry"] == DBNull.Value ? 0 : Convert.ToInt32(row["UgpEntry"]),
                     SUoMEntry = row["SUoMEntry"] == DBNull.Value ? 0 : Convert.ToInt32(row["SUoMEntry"]),
 
-                    StdWhs = row.Field<string>("U_XN_StdMag")
+                    StdWhs = row.Field<string>("U_XN_StdMag"),
+
+                    XN_Thumb = row.Field<string>("U_XN_Thumb"),
+                    XN_HiRes = row.Field<string>("U_XN_HiRes")
+
                 })
                 .Select(g => new
                 {
@@ -103,6 +108,7 @@ namespace XNDmjApi.Services
                     itemGroupCode = g.Key.ItmsGrpCod,
                     itemGroupName = g.Key.ItmsGrpNam,
                     price = g.Key.Price,
+                    priceUnit = g.Key.PriceUnit,
                     currency = g.Key.Currency,
                     discount = g.Key.Discount,
                     onHand = g.Key.OnHand,
@@ -119,6 +125,8 @@ namespace XNDmjApi.Services
                     salesUom = g.Key.SalUnitMsr,    // ex: "uni"
                     inventoryUom = g.Key.InventoryUom,  // ex: "ml"
 
+                    
+
                     // 🔹 Llista de UoM (units) per article
                     units = g.Select(row => new
                     {
@@ -129,8 +137,12 @@ namespace XNDmjApi.Services
                         baseQty = row["BaseQty"] == DBNull.Value ? 0m : Convert.ToDecimal(row["BaseQty"]),
                         altQty = row["AltQty"] == DBNull.Value ? 0m : Convert.ToDecimal(row["AltQty"]),
 
-                        isDefaultSalesUom = (row["IsDefaultSalesUom"]?.ToString() == "Y")
-                    }).ToList()
+                        isDefaultSalesUom = (row["IsDefaultSalesUom"]?.ToString() == "Y").ToString()
+                    }).ToList(),
+
+                    // ⚖️ Pes per UM de venda (NO recalcularem per UoM)
+                    thumb = g.Key.XN_Thumb,
+                    hires = g.Key.XN_HiRes,
                 })
                 .ToList();
 

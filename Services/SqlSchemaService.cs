@@ -1,12 +1,11 @@
-﻿using Newtonsoft.Json;
-using SAPbobsCOM;
+﻿using SAPbobsCOM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using XNDmjApi.Functions;
-using XNDmjApi.Models;
+using XNDmjApi.Models.DbSetup;
 
 namespace XNDmjApi.Services
 {
@@ -24,12 +23,11 @@ namespace XNDmjApi.Services
         }
 
         /// <summary>
-        /// IMPORTANT: Aquest Ensure JA NO crea taules SQL “normals”.
-        /// Ara crea UDT/UDO via SAP DI-API (requisit SAP) perquè a SQL quedin com @...
+        /// IMPORTANT: Aquest Ensure crea UDT/UDO via SAP DI-API (requisit SAP) perquè a SQL quedin com @...
         /// </summary>
-        public EnsureResult Ensure(SqlSchemaSpec spec)
+        public EnsureResult Ensure(DbSchema schema)
         {
-            if (spec == null || spec.Tables == null || spec.Tables.Count == 0)
+            if (schema == null || schema.Tables == null || schema.Tables.Count == 0)
                 return new EnsureResult { Ok = false, Code = "MISSING_SCHEMA", Message = "schemaJson sense taules." };
 
             // Context DB obligatori (sense defaults perillosos)
@@ -73,20 +71,39 @@ namespace XNDmjApi.Services
             var res = new EnsureResult { Ok = true, Code = "OK", Message = "UDT/UDO assegurats." };
 
             // Normalitzem taules per nom (sense schema)
-            var tablesByName = spec.Tables
+            var tablesByName = schema.Tables
                 .Where(t => t != null && !string.IsNullOrWhiteSpace(t.Name))
                 .ToDictionary(t => t.Name.Trim(), t => t, StringComparer.OrdinalIgnoreCase);
 
             var allTableNames = tablesByName.Keys.ToList();
 
-            // Detectem estructura Change-Requests (header + 2 child)
-            var hasCrqUdo =
-                tablesByName.ContainsKey("XN_CRQ") &&
-                tablesByName.ContainsKey("XN_CRQ1") &&
-                tablesByName.ContainsKey("XN_CRQ_EVT");
+            // UDOs declarats al JSON (schema.udos)
+            var udoSpecs = (schema.Udos ?? new List<DbUdoSpec>())
+                .Where(u => u != null
+                    && !string.IsNullOrWhiteSpace(u.Code)
+                    && !string.IsNullOrWhiteSpace(u.HeaderTable))
+                .ToList();
 
-            var crqHeader = "XN_CRQ";
-            var crqChildren = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "XN_CRQ1", "XN_CRQ_EVT" };
+            // Mapa: taula -> tipus UDT requerit per UDO (header/lines)
+            var udtTypeByTable = new Dictionary<string, BoUTBTableType>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var u in udoSpecs)
+            {
+                var header = (u.HeaderTable ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(header)) continue;
+
+                ValidateName(header, "udo header table");
+                udtTypeByTable[header] = BoUTBTableType.bott_MasterData;
+
+                foreach (var ct in (u.ChildTables ?? new List<string>()))
+                {
+                    var child = (ct ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(child)) continue;
+
+                    ValidateName(child, "udo child table");
+                    udtTypeByTable[child] = BoUTBTableType.bott_MasterDataLines;
+                }
+            }
 
             // 1) Crear/assegurar UDT per cada taula
             foreach (var tableName in allTableNames)
@@ -94,23 +111,17 @@ namespace XNDmjApi.Services
                 ValidateName(tableName, "table");
 
                 // IMPORTANT SAP:
-                // - Si anem a crear UDO CRQ: header = MasterData, children = MasterDataLines
+                // - Si la taula forma part d'un UDO: header = MasterData, children = MasterDataLines
                 // - La resta: NoObject (no inventem UDOs)
                 BoUTBTableType tt = BoUTBTableType.bott_NoObject;
-
-                if (hasCrqUdo)
-                {
-                    if (tableName.Equals(crqHeader, StringComparison.OrdinalIgnoreCase))
-                        tt = BoUTBTableType.bott_MasterData;
-                    else if (crqChildren.Contains(tableName))
-                        tt = BoUTBTableType.bott_MasterDataLines;
-                }
+                if (udtTypeByTable.TryGetValue(tableName, out var forcedType))
+                    tt = forcedType;
 
                 EnsureUserTable(tableName, $"DOMENJÓ {tableName}", tt, res);
 
                 // 2) Crear/assegurar UDFs segons columns
                 var t = tablesByName[tableName];
-                var cols = (t.Columns ?? new List<SqlColumnSpec>());
+                var cols = (t.Columns ?? new List<DbColumnSpec>());
 
                 foreach (var c in cols)
                 {
@@ -118,27 +129,51 @@ namespace XNDmjApi.Services
                     var colName = (c.Name ?? "").Trim();
                     if (string.IsNullOrWhiteSpace(colName)) continue;
 
-                    // En UDT/UDO NO creem el teu "Id identity" com a columna real:
-                    // - La clau en UDT és Code (i per child, Code + LineId)
-                    // - Si al JSON t’arriba "Id" primaryKey/identity, l’ignorarem.
-                    if (string.Equals(colName, "Id", StringComparison.OrdinalIgnoreCase) && (c.Identity || c.PrimaryKey))
+                    // En UDT/UDO no creem "Id identity" com a columna real
+                    if (string.Equals(colName, "Id", StringComparison.OrdinalIgnoreCase) && c.Identity)
                         continue;
 
-                    // UDF name a DI-API va sense "U_" (SAP li posa U_ a SQL)
                     ValidateName(colName, "column");
-
                     EnsureUserFieldForUdt(tableName, c, res);
                 }
             }
 
-            // 3) Crear/assegurar UDO si detectem XN_CRQ (header + 2 child)
-            if (hasCrqUdo)
+            // 3) Crear/assegurar UDOs declarats
+            if (udoSpecs.Count == 0)
             {
-                EnsureUdoChangeRequests(crqHeader, new[] { "XN_CRQ1", "XN_CRQ_EVT" }, res);
+                res.Actions.Add("! Nota: No s'ha creat cap UDO perquè el schema no inclou 'udos'.");
             }
             else
             {
-                res.Actions.Add("! Nota: No s'ha creat UDO perquè no s'han trobat totes les taules XN_CRQ, XN_CRQ1 i XN_CRQ_EVT al schema.");
+                foreach (var u in udoSpecs)
+                {
+                    var code = (u.Code ?? "").Trim();
+                    var header = (u.HeaderTable ?? "").Trim();
+
+                    if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(header))
+                        continue;
+
+                    ValidateName(code, "udo code");
+                    ValidateName(header, "udo header table");
+
+                    // Guard: que les taules existeixin al schema (evitem sorpreses)
+                    if (!tablesByName.ContainsKey(header))
+                        throw new Exception($"UDO '{code}': headerTable '{header}' no existeix a schema.tables.");
+
+                    foreach (var ct in (u.ChildTables ?? new List<string>()))
+                    {
+                        var child = (ct ?? "").Trim();
+                        if (string.IsNullOrWhiteSpace(child)) continue;
+                        if (!tablesByName.ContainsKey(child))
+                            throw new Exception($"UDO '{code}': childTable '{child}' no existeix a schema.tables.");
+                    }
+
+                    var udoName = (u.Name ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(udoName))
+                        udoName = $"DOMENJÓ {code}";
+
+                    EnsureUdoGeneric(code, udoName, header, u.ChildTables ?? new List<string>(), res);
+                }
             }
 
             res.Message = "UDT/UDO creats/actualitzats (via DI-API).";
@@ -152,7 +187,6 @@ namespace XNDmjApi.Services
             {
                 ut = (UserTablesMD)Dades.oCompany.GetBusinessObject(BoObjectTypes.oUserTables);
 
-                // Existeix?
                 if (ut.GetByKey(tableName))
                     return;
 
@@ -172,18 +206,16 @@ namespace XNDmjApi.Services
             }
         }
 
-        private static void EnsureUserFieldForUdt(string udtName, SqlColumnSpec c, EnsureResult res)
+        private static void EnsureUserFieldForUdt(string udtName, DbColumnSpec c, EnsureResult res)
         {
             UserFieldsMD? uf = null;
             try
             {
                 var fieldName = (c.Name ?? "").Trim();
-                var sqlType = (c.Type ?? "").Trim();
+                var sqlType = (c.SqlType ?? "").Trim();
 
-                // TableName per UDT fields habitualment és "@TABLE"
                 var sapTableName = "@" + udtName;
 
-                // Existeix?
                 if (UserFieldExists(sapTableName, "U_" + fieldName))
                     return;
 
@@ -191,10 +223,8 @@ namespace XNDmjApi.Services
                 uf.TableName = sapTableName;
                 uf.Name = fieldName;
 
-                // Nullable => Mandatory NO
                 uf.Mandatory = c.Nullable ? BoYesNoEnum.tNO : BoYesNoEnum.tYES;
 
-                // Map tipus (subset robust per Change-Requests)
                 ApplyTypeMapping(sqlType, uf);
 
                 var rc = uf.Add();
@@ -209,25 +239,21 @@ namespace XNDmjApi.Services
             }
         }
 
-        private static void EnsureUdoChangeRequests(string headerTable, IEnumerable<string> childTables, EnsureResult res)
+        private static void EnsureUdoGeneric(string udoCode, string udoName, string headerTable, IEnumerable<string> childTables, EnsureResult res)
         {
             UserObjectsMD? uo = null;
             try
             {
-                var udoCode = headerTable;
-
-                // Existeix?
                 if (UdoExists(udoCode))
                     return;
 
                 uo = (UserObjectsMD)Dades.oCompany.GetBusinessObject(BoObjectTypes.oUserObjectsMD);
 
                 uo.Code = udoCode;
-                uo.Name = "DOMENJÓ Change Requests";
+                uo.Name = udoName;
                 uo.ObjectType = BoUDOObjType.boud_MasterData;
-                uo.TableName = headerTable; // sense '@'
+                uo.TableName = headerTable;
 
-                // Features mínimes
                 uo.CanCancel = BoYesNoEnum.tNO;
                 uo.CanClose = BoYesNoEnum.tNO;
                 uo.CanCreateDefaultForm = BoYesNoEnum.tNO;
@@ -242,7 +268,7 @@ namespace XNDmjApi.Services
                     if (string.IsNullOrWhiteSpace(child)) continue;
                     ValidateName(child, "child table");
 
-                    uo.ChildTables.TableName = child; // sense '@'
+                    uo.ChildTables.TableName = child;
                     uo.ChildTables.Add();
                 }
 
@@ -300,20 +326,17 @@ namespace XNDmjApi.Services
         {
             var t = (sqlType ?? "").Trim().ToLowerInvariant();
 
-            // nvarchar(max) -> Memo
             if (t.StartsWith("nvarchar(") && t.Contains("max"))
             {
                 uf.Type = BoFieldTypes.db_Memo;
                 return;
             }
 
-            // nvarchar(n)
             if (t.StartsWith("nvarchar("))
             {
                 var n = ExtractSize(t);
                 if (n <= 0) n = 50;
 
-                // SAP Alpha max habitual 254; si excedeix -> Memo
                 if (n > 254)
                 {
                     uf.Type = BoFieldTypes.db_Memo;
@@ -326,26 +349,19 @@ namespace XNDmjApi.Services
                 return;
             }
 
-            // int/bigint -> Numeric
             if (t == "int" || t == "bigint")
             {
                 uf.Type = BoFieldTypes.db_Numeric;
                 uf.SubType = BoFldSubTypes.st_None;
-
-                // IMPORTANT (DI-API): per Numeric s'usa EditSize (1..11), NO Size
-                uf.EditSize = 11; // suficient per int i per IDs típics
-
+                uf.EditSize = 11;
                 return;
             }
 
-
-            // bit -> Alpha(1) amb valors 0/1 (evitem enums que no existeixen al teu SAPbobsCOM)
             if (t == "bit")
             {
                 uf.Type = BoFieldTypes.db_Alpha;
                 uf.Size = 1;
 
-                // Valid values: "0" / "1"
                 try
                 {
                     uf.ValidValues.Value = "0";
@@ -356,19 +372,15 @@ namespace XNDmjApi.Services
                     uf.ValidValues.Description = "1";
                     uf.ValidValues.Add();
                 }
-                catch
-                {
-                    // si algun entorn no permet ValidValues en aquest tipus, no trenquem la creació del camp
-                }
+                catch { }
 
                 return;
             }
 
-            // datetime2/datetime -> guardem ISO (Alpha) per mantenir hora
             if (t == "datetime2" || t == "datetime")
             {
                 uf.Type = BoFieldTypes.db_Alpha;
-                uf.Size = 25; // ex: 2026-01-28T12:34:56Z
+                uf.Size = 25;
                 return;
             }
 
@@ -391,7 +403,7 @@ namespace XNDmjApi.Services
             {
                 if (uf.Type == BoFieldTypes.db_Alpha) return $"Alpha({uf.Size})";
                 if (uf.Type == BoFieldTypes.db_Memo) return "Memo";
-                if (uf.Type == BoFieldTypes.db_Numeric) return $"Numeric({uf.Size})";
+                if (uf.Type == BoFieldTypes.db_Numeric) return $"Numeric(EditSize={uf.EditSize})";
                 if (uf.Type == BoFieldTypes.db_Date) return "Date";
                 return uf.Type.ToString();
             }
@@ -414,7 +426,7 @@ namespace XNDmjApi.Services
                 if (o != null && Marshal.IsComObject(o))
                     Marshal.ReleaseComObject(o);
             }
-            catch { /* ignore */ }
+            catch { }
         }
     }
 }

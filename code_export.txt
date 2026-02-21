@@ -1,0 +1,2011 @@
+﻿
+================================================================================
+FILE: Controllers/ItemsController.cs
+================================================================================
+
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
+using SAPbobsCOM;
+using System.Globalization;
+using XNDmjApi.Functions;
+using XNDmjApi.Infrastructure.ApiKeys;
+using XNDmjApi.Models;
+using XNDmjApi.Services;
+
+
+// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+
+namespace XNDmjApi.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ItemsController : ControllerBase
+    {
+        
+        // POST api/<ItemsController>
+        [HttpPost("GetItems")]
+        public ActionResult GetItems([FromForm]string itemCode="%", [FromForm] string itemName = "%", [FromForm] string itmsGrpCod = "%", [FromForm] string validFor = "Y")
+        {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+            //Clases.Log.LogWrite($"SetPassword: token={token}, encriptedOldPassword={encriptedOldPassword}, encriptedNewPassword={encriptedNewPassword}");
+            ItemsService SItems = new ItemsService();
+            string jsonResult = SItems.GetItem(itemCode, itemName, itmsGrpCod, validFor);
+            
+
+            if (jsonResult != null)
+                return Ok(jsonResult);
+            else
+                return BadRequest(jsonResult);
+        }
+
+
+        // POST api/<ItemsController>
+        /// <summary>
+        /// Articles de venda (preus + descomptes) amb filtre
+        /// per client, codi, descripció i grup.
+        /// </summary>
+        [HttpPost("GetItemsSales")]
+        public ActionResult GetItemsSales([FromForm] string cardCode = "%",[FromForm] string itemCode = "%", [FromForm] string itemName = "%",[FromForm] string itmsGrpCod = "%" )
+        {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+            ItemsService SItems = new ItemsService();
+
+            // Fem servir el nou mètode GetItemSales (no canviem la ruta HTTP)
+            string jsonResult = SItems.GetItemSales(cardCode, itemCode, itemName, itmsGrpCod);
+
+            if (jsonResult != null)
+                return Ok(jsonResult);
+            else
+                return BadRequest(jsonResult);
+        }
+
+        /// <summary>
+        /// Resum d’articles comprats per un client (CardCode)
+        /// filtrat per any o per rang de dates.
+        ///
+        /// POST api/Items/GetItemsPurchasedSummary
+        ///
+        /// Body (form-data / x-www-form-urlencoded):
+        ///   cardCode = codi de client SAP (OCRD.CardCode)
+        ///   year     = any, opcional (p.ex. 2024)
+        ///   fromDate = data inicial (YYYY-MM-DD), opcional
+        ///   toDate   = data final   (YYYY-MM-DD), opcional
+        ///
+        /// Regles:
+        ///   - Si arriba "year", fem servir tot l’exercici.
+        ///   - Si no hi ha "year", fem servir fromDate + toDate.
+        /// </summary>
+        [HttpPost("GetItemsPurchasedSummary")]
+        public ActionResult GetItemsPurchasedSummary([FromForm] string cardCode,[FromForm] string year = "",[FromForm] string fromDate = "",[FromForm] string toDate = "")
+        {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+            if (string.IsNullOrWhiteSpace(cardCode))
+            {
+                return BadRequest("Falta el CardCode.");
+            }
+
+            // 1️⃣ Calculem el rang de dates
+            DateTime from;
+            DateTime to;
+
+            if (!string.IsNullOrWhiteSpace(year))
+            {
+                // Si ens passen l’any, agafem tot l’exercici
+                if (!int.TryParse(year, out int any))
+                {
+                    return BadRequest("Any invàlid.");
+                }
+
+                from = new DateTime(any, 1, 1);
+                to = new DateTime(any, 12, 31);
+            }
+            else
+            {
+                // Si no hi ha any, exigim fromDate + toDate
+                if (string.IsNullOrWhiteSpace(fromDate) || string.IsNullOrWhiteSpace(toDate))
+                {
+                    return BadRequest("Has d'indicar un any o bé fromDate + toDate.");
+                }
+
+                // Format esperat: YYYY-MM-DD
+                if (!DateTime.TryParseExact(fromDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out from))
+                {
+                    return BadRequest("fromDate amb format invàlid. Usa YYYY-MM-DD.");
+                }
+
+                if (!DateTime.TryParseExact(toDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out to))
+                {
+                    return BadRequest("toDate amb format invàlid. Usa YYYY-MM-DD.");
+                }
+            }
+
+            // 2️⃣ Cridem el servei de negoci
+            var svc = new ItemsPurchasedService();
+            string jsonResult = svc.GetItemsPurchasedSummary(cardCode, from, to);
+
+            // 3️⃣ Retornem el JSON, mateix patró que la resta d’ItemsController
+            if (jsonResult != null)
+                return Ok(jsonResult);
+            else
+                return BadRequest(jsonResult);
+        }
+
+        /// <summary>
+        /// Històric de compres d’un article concret per un client.
+        /// 
+        /// POST api/Items/GetItemPurchaseHistory
+        ///
+        /// Body (form-data / x-www-form-urlencoded):
+        ///   cardCode = codi de client SAP (OCRD.CardCode)
+        ///   itemCode = codi d'article (INV1.ItemCode)
+        ///   year     = any, opcional (p.ex. 2024)
+        ///   fromDate = data inicial (YYYY-MM-DD), opcional
+        ///   toDate   = data final   (YYYY-MM-DD), opcional
+        ///
+        /// Regles:
+        ///   - Si arriba "year", fem servir tot l’exercici.
+        ///   - Si no hi ha "year", fem servir fromDate + toDate.
+        /// </summary>
+        [HttpPost("GetItemPurchasedHistory")]
+        public ActionResult GetItemPurchasedHistory([FromForm] string cardCode,[FromForm] string itemCode,[FromForm] string year = "",[FromForm] string fromDate = "",[FromForm] string toDate = "")
+        {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+            if (string.IsNullOrWhiteSpace(cardCode))
+            {
+                return BadRequest("Falta el CardCode.");
+            }
+
+            if (string.IsNullOrWhiteSpace(itemCode))
+            {
+                return BadRequest("Falta l'ItemCode.");
+            }
+
+            // 1️⃣ Calculem el rang de dates
+            DateTime from;
+            DateTime to;
+
+            if (!string.IsNullOrWhiteSpace(year))
+            {
+                if (!int.TryParse(year, out int any))
+                {
+                    return BadRequest("Any invàlid.");
+                }
+
+                from = new DateTime(any, 1, 1);
+                to = new DateTime(any, 12, 31);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(fromDate) || string.IsNullOrWhiteSpace(toDate))
+                {
+                    return BadRequest("Has d'indicar un any o bé fromDate + toDate.");
+                }
+
+                if (!DateTime.TryParseExact(fromDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out from))
+                {
+                    return BadRequest("fromDate amb format invàlid. Usa YYYY-MM-DD.");
+                }
+
+                if (!DateTime.TryParseExact(toDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out to))
+                {
+                    return BadRequest("toDate amb format invàlid. Usa YYYY-MM-DD.");
+                }
+            }
+
+            // 2️⃣ Cridem el servei de negoci
+            var svc = new ItemsPurchasedService();
+            string jsonResult = svc.GetItemPurchasedHistory(cardCode, itemCode, from, to);
+
+            // 3️⃣ Retornem el JSON, mateix patró que la resta d’ItemsController
+            if (jsonResult != null)
+                return Ok(jsonResult);
+            else
+                return BadRequest(jsonResult);
+        }
+
+        /// <summary>
+        /// Retorna la informació de media d'un article (via SQL, sense DI-API):
+        /// U_XN_HiRes, U_XN_Thumb, U_XN_FT, U_XN_LongDesc i Proveïdor preferent.
+        /// 
+        /// POST api/Items/GetItemMediaInfo
+        /// Body (form-data / x-www-form-urlencoded):
+        ///   itemCode = codi de l'article
+        /// </summary>
+        [HttpPost("GetItemMediaInfo")]
+        public ActionResult GetItemMediaInfo([FromForm] string itemCode)
+        {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+
+            if (string.IsNullOrWhiteSpace(itemCode))
+            {
+                return BadRequest("Falta el camp obligatori itemCode.");
+            }
+
+            try
+            {
+                var svc = new SapItemMediaService();
+                var info = svc.GetItemMediaInfo(itemCode.Trim());
+
+                // Sempre retornem JSON (application/json) amb l'objecte.
+                return Ok(info);
+            }
+            catch (Exception ex)
+            {
+                // Ara com a mínim veuràs el motiu real al Swagger / client.
+                return StatusCode(500, "GetItemMediaInfo ERROR: " + ex.Message);
+            }
+        }
+
+
+
+        /// <summary>
+        /// Processa media (imatges + fitxes tècniques) per un article
+        /// i, opcionalment, les seves variants.
+        /// 
+        /// POST api/Items/ProcessItemMedia
+        /// 
+        /// Body (multipart/form-data):
+        ///   itemCode   = codi d'article origen (obligatori)
+        ///   imageUrl   = URL d'origen de la imatge (opcional)
+        ///   imageFile  = fitxer d'imatge (opcional)
+        ///   fileUrl    = URL d'origen de la fitxa tècnica (opcional)
+        ///   techFile   = fitxer de fitxa tècnica (opcional)
+        ///   targetItems= llista de variants separades per comes
+        ///   copyImage  = flag per copiar imatge a variants
+        ///   copyFicha  = flag per copiar fitxa tècnica a variants
+        ///   copyDesc   = flag per copiar descripció llarga a variants
+        /// </summary>
+        [HttpPost("ProcessItemMedia")]
+        public ActionResult ProcessItemMedia([FromForm] ProcessItemMediaRequest request)
+        {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+
+            // 🧪 En aquesta fase només fem wiring al servei de negoci.
+            //     - No fem validacions fortes encara.
+            //     - No toquem NAS ni DI-API.
+            //     - Només retornem l'estructura de resposta “stub”.
+
+            if (!ModelState.IsValid)
+            {
+                // Aquí podries escriure a log tots els errors i valors:
+                var errors = ModelState
+                    .Where(kv => kv.Value?.Errors.Count > 0)
+                    .Select(kv => new {
+                        Field = kv.Key,
+                        Errors = kv.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+                    });
+
+                // Log(errors) ...
+                // Però això ja és per depuració; no cal per producció si ara va bé.
+            }
+
+            if (request == null || string.IsNullOrWhiteSpace(request.ItemCode))
+            {
+                return BadRequest("Falta el camp obligatori itemCode.");
+            }
+
+            var svc = new ItemMediaService();
+            ProcessItemMediaResponse response = svc.ProcessItemMedia(request);
+
+            // De moment, sempre tornem 200 OK amb el cos de resposta,
+            // encara que response.Success sigui false. Més endavant
+            // podrem decidir si en alguns casos retornem 400/500, etc.
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Retorna la miniatura de la imatge de producte com a image/jpeg.
+        /// 
+        /// Exemple:
+        ///   GET api/Items/GetItemMediaThumbnail?itemCode=VA999999
+        /// </summary>
+        [HttpGet("GetItemMediaThumbnail")]
+        public IActionResult GetItemMediaThumbnail([FromQuery] string itemCode)
+        {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+
+            if (string.IsNullOrWhiteSpace(itemCode))
+            {
+                return BadRequest("Falta el camp obligatori itemCode.");
+            }
+
+            var nasService = new NasService();
+
+            byte[] thumbBytes;
+            try
+            {
+                thumbBytes = nasService.GetItemThumbnailBytes(itemCode);
+            }
+            catch (Exception ex)
+            {
+                // Aquí podries fer log de l'error si cal
+                return StatusCode(500, $"Error en obtenir la miniatura: {ex.Message}");
+            }
+
+            if (thumbBytes == null || thumbBytes.Length == 0)
+            {
+                return NotFound("No s'ha trobat cap imatge per aquest article.");
+            }
+
+            // Retornem la imatge com a JPEG perquè el navegador la pugui mostrar directament
+            return File(thumbBytes, "image/jpeg");
+        }
+
+        // =====================================================================
+        // Helper central: Perfil + Selecció de BD (mateix patró que ClientsSelf)
+        // ---------------------------------------------------------------------
+        // Ús a cada endpoint d'Items:
+        // var fail = RequireProfileAndSelectDb(out var profile);
+        // if (fail != null) return fail;
+        //
+        // Depèn de:
+        // - ApiKeyProfileMiddleware (middleware) resol el perfil i el posa a:
+        // HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey]
+        // - ApiKeyProfile.CompanyDb és el selector de DB (PROD/TEST)
+        //
+        // IMPORTANT: Dades.* és estàtic/global → risc en concurrència amb perfils diferents.
+        // NO es toca ara: només repliquem el patró existent.
+        // =====================================================================
+        private ActionResult? RequireProfileAndSelectDb(out ApiKeyProfile? profile)
+        {
+            // 1) Recupera perfil resolt pel middleware
+            profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+            {
+                return Unauthorized(new
+                {
+                    ok = false,
+                    code = "MISSING_PROFILE",
+                    message = "Falta perfil (ProfileApiKey o X-Api-Key)."
+                });
+            }
+            // 2) CompanyDb és el “selector” de la BD
+            var db = (profile.CompanyDb ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(db))
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_CONTEXT_MISSING",
+                    message = "El perfil no porta CompanyDb."
+                });
+            }
+            // 3) Inicialitza / canvia DB context abans de cridar serveis SQL
+            try
+            {
+                // Recalcula només si cal:
+                // - si canvia el DB
+                // - o si encara no tenim ConnectionStringDOMENJO
+                if (!string.Equals(Dades.DOMENJO_BBDD ?? "", db, StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = db;
+                    Dades.SetupDades();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_SELECT_FAILED",
+                    message = ex.Message
+                });
+            }
+            return null; // OK
+        }
+
+    }
+}
+
+
+================================================================================
+FILE: Infrastructure/ApiKeys/ApiKeyProfileMiddleware.cs
+================================================================================
+
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
+using System;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace XNDmjApi.Infrastructure.ApiKeys
+{
+    /// <summary>
+    /// ApiKeyProfileMiddleware
+    /// ----------------------
+    /// Objectiu:
+    ///   - Llegir la API key d'entrada (preferent: ProfileApiKey; fallback: X-Api-Key i variants)
+    ///   - Resoldre el perfil (CompanyDb + SapUser + SapPassword) des de ApiKeyProfilesOptions.Profiles
+    ///   - Deixar-lo a HttpContext.Items[HttpContextItemKey] perquè Controllers/Services decideixin BD/credencials
+    ///
+    /// IMPORTANT:
+    ///   - Aquest middleware NOMÉS s'aplica a certs prefixos de ruta.
+    ///   - Afegir nous endpoints "profile-scoped" = afegir un nou StartsWithSegments(...) a isProfileScoped.
+    ///   - No cal tocar la lògica de resolució de perfils.
+    /// </summary>
+    public sealed class ApiKeyProfileMiddleware
+    {
+        // Clau estable per consultar el perfil des de controllers/serveis
+        public const string HttpContextItemKey = "dmj.api.apikey.profile";
+
+        private readonly RequestDelegate _next;
+        private readonly ApiKeyProfilesOptions _opt;
+
+        public ApiKeyProfileMiddleware(RequestDelegate next, IOptions<ApiKeyProfilesOptions> opt)
+        {
+            _next = next;
+            _opt = opt?.Value ?? new ApiKeyProfilesOptions();
+        }
+
+        // -------------------------------------------------------------
+        // RUTES "PROFILE-SCOPED"
+        // -------------------------------------------------------------
+        // ? Afegir nous endpoints protegits per ProfileApiKey:
+        //    - AFEGEIX el prefix aquí (una línia)
+        //    - NO toquis la resta de la lògica del middleware
+        private static readonly string[] ProfileScopedPrefixes = new[]
+        {
+            "/api/SapChangeRequestsUdo",
+            "/api/clients/self",
+            "/api/Login/RequestPasswordReset",
+            "/api/Login/ResetPasswordByToken",
+            "/api/Login/ResetPassword",
+            "/api/Items",
+            "/api/SalesOffers",
+            "/api/SalesOrders",
+            "/api/SalesDeliveryNotes",
+            "/api/SalesReturns",
+            "/api/SalesInvoices",
+            "/api/SalesCreditNotes",
+            "/api/intranetSetup/Obres",
+            "/api/intranetSetup/Operaris",
+        };
+
+        private static bool AppliesToPath(PathString path)
+        {
+            foreach (var pref in ProfileScopedPrefixes)
+            {
+                if (path.StartsWithSegments(pref, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+
+        public async Task Invoke(HttpContext ctx)
+        {
+            if (ctx == null) { await _next(ctx!); return; }
+
+            // -------------------------------------------------------------
+            // PAS 0) Decideix si aquest middleware aplica a la request actual
+            // -------------------------------------------------------------
+            var path = ctx.Request.Path;
+
+            // --- CODI ANTIC (ABANS) ---
+            // IMPORTANT: abans només aplicava a SapChangeRequestsUdo
+            // if (!path.StartsWithSegments("/api/SapChangeRequestsUdo", StringComparison.OrdinalIgnoreCase))
+            // {
+            //     await _next(ctx);
+            //     return;
+            // }
+
+            // --- CODI NOU (ARA) ---
+            // Afegim /api/clients/self perquè aquests endpoints també necessiten perfil + selecció de DB.
+            // (i mantenim els altres que ja tenies)
+            if (!AppliesToPath(path))
+            {
+                await _next(ctx);
+                return;
+            }
+
+
+            // -------------------------------------------------------------
+            // PAS 1) Validar que la configuració de perfils existeix
+            // -------------------------------------------------------------
+            // Necessitem: ApiKeyProfilesOptions.Profiles["prod|test|..."] amb ApiKey/CompanyDb/SapUser/SapPassword
+            if (_opt.Profiles == null || _opt.Profiles.Count == 0)
+            {
+                ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                await ctx.Response.WriteAsJsonAsync(new
+                {
+                    ok = false,
+                    code = "APIKEY_PROFILES_MISSING",
+                    message = "Falta config ApiKeyProfiles (Profiles buida)."
+                });
+                return;
+            }
+
+            // -------------------------------------------------------------
+            // PAS 2) Llegir la key entrant (preferent ProfileApiKey; fallback legacy)
+            // -------------------------------------------------------------
+            // Ordre:
+            //   1) Header ProfileApiKey            (nou)
+            //   2) Header X-Api-Key / X-API-Key... (legacy)
+            //   3) Authorization: Bearer <key>     (extra compat, opcional però útil)
+            string incoming = "";
+
+            if (TryGetHeader(ctx, "ProfileApiKey", out incoming))
+            {
+                // OK
+            }
+            else if (TryGetHeader(ctx, "X-Api-Key", out incoming)
+                  || TryGetHeader(ctx, "X-API-Key", out incoming)
+                  || TryGetHeader(ctx, "x-api-key", out incoming))
+            {
+                // OK (legacy)
+            }
+            else if (TryGetHeader(ctx, "Authorization", out incoming))
+            {
+                // Compat: "Bearer <key>"
+                if (incoming.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    incoming = incoming.Substring(7).Trim();
+            }
+
+            incoming = (incoming ?? "").Trim().Trim('"');
+
+            if (string.IsNullOrWhiteSpace(incoming))
+            {
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await ctx.Response.WriteAsJsonAsync(new
+                {
+                    ok = false,
+                    code = "MISSING_API_KEY",
+                    message = "Falta header ProfileApiKey (o X-Api-Key durant la transició)."
+                });
+                return;
+            }
+
+            // -------------------------------------------------------------
+            // PAS 3) Resoldre el perfil segons la key (comparació en temps constant)
+            // -------------------------------------------------------------
+            var prof = ResolveProfile(incoming);
+            if (prof == null)
+            {
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await ctx.Response.WriteAsJsonAsync(new
+                {
+                    ok = false,
+                    code = "INVALID_API_KEY",
+                    message = "API key incorrecta (ProfileApiKey / X-Api-Key)."
+                });
+                return;
+            }
+
+            // -------------------------------------------------------------
+            // PAS 4) Guardar el perfil perquè el controller el pugui consumir
+            // -------------------------------------------------------------
+            // Exemple al controller:
+            //   var profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            //   ... i a partir d'aquí selecciones DB / credencials.
+            ctx.Items[HttpContextItemKey] = prof;
+
+            await _next(ctx);
+        }
+
+        // -------------------------------------------------------------
+        // Helpers
+        // -------------------------------------------------------------
+
+        private ApiKeyProfile? ResolveProfile(string incoming)
+        {
+            foreach (var kv in _opt.Profiles)
+            {
+                string name = kv.Key ?? "";
+                var cfg = kv.Value;
+                if (cfg == null) continue;
+
+                string cfgKey = (cfg.ApiKey ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(cfgKey)) continue;
+
+                if (FixedEquals(incoming, cfgKey))
+                {
+                    return new ApiKeyProfile(
+                        name: name,
+                        companyDb: (cfg.CompanyDb ?? "").Trim(),
+                        sapUser: (cfg.SapUser ?? "").Trim(),
+                        sapPassword: (cfg.SapPassword ?? "").Trim()
+                    );
+                }
+            }
+            return null;
+        }
+
+        private static bool TryGetHeader(HttpContext ctx, string headerName, out string value)
+        {
+            value = "";
+            if (!ctx.Request.Headers.TryGetValue(headerName, out var vals))
+                return false;
+
+            // agafem el primer valor
+            value = (vals.Count > 0 ? vals[0] : "")?.ToString()?.Trim() ?? "";
+            return !string.IsNullOrWhiteSpace(value);
+        }
+
+        private static bool FixedEquals(string a, string b)
+        {
+            if (a == null || b == null) return false;
+            var ba = Encoding.UTF8.GetBytes(a);
+            var bb = Encoding.UTF8.GetBytes(b);
+            if (ba.Length != bb.Length) return false;
+            return CryptographicOperations.FixedTimeEquals(ba, bb);
+        }
+    }
+}
+
+
+================================================================================
+FILE: Infrastructure/ApiKeys/ApiKeyProfilesOptions.cs
+================================================================================
+
+using System.Collections.Generic;
+
+namespace XNDmjApi.Infrastructure.ApiKeys
+{
+    // appsettings / env:
+    // "ApiKeyProfiles": {
+    //   "prod": { "ApiKey":"...", "CompanyDb":"SBO_DOMENJO", "SapUser":"...", "SapPassword":"..." },
+    //   "test": { "ApiKey":"...", "CompanyDb":"TEST",        "SapUser":"...", "SapPassword":"..." }
+    // }
+    public sealed class ApiKeyProfilesOptions
+    {
+        public Dictionary<string, ApiKeyProfileConfig> Profiles { get; set; } = new();
+    }
+
+    public sealed class ApiKeyProfileConfig
+    {
+        public string ApiKey { get; set; } = "";
+        public string CompanyDb { get; set; } = "";
+        public string SapUser { get; set; } = "";
+        public string SapPassword { get; set; } = "";
+    }
+
+    public sealed class ApiKeyProfile
+    {
+        public string Name { get; }
+        public string CompanyDb { get; }
+        public string SapUser { get; }
+        public string SapPassword { get; }
+
+        public ApiKeyProfile(string name, string companyDb, string sapUser, string sapPassword)
+        {
+            Name = name ?? "";
+            CompanyDb = companyDb ?? "";
+            SapUser = sapUser ?? "";
+            SapPassword = sapPassword ?? "";
+        }
+    }
+}
+
+
+================================================================================
+FILE: Controllers/SAPLoginController.cs
+================================================================================
+
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using XNDmjApi.Functions;
+using XNDmjApi.Services;
+
+namespace XNDmjApi.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class SAPLoginController : ControllerBase
+    {
+        SAPLoginService login = new SAPLoginService();
+
+        [HttpPost("getLoginToken")]
+        public ActionResult getLoginToken([FromForm] string user, [FromForm] string password, [FromForm] string bbdd)
+        {
+
+            string loginToken = login.GetLoginToken(user, password, bbdd);
+
+            return Ok(loginToken);
+        }
+
+        [HttpPost("loginByToken")]
+        public ActionResult LoginByToken([FromForm] string loginToken)
+        {
+            
+            string userToken = login.LoginByToken(loginToken);
+
+            if (userToken == null || userToken == "-1")
+                return BadRequest("Token caducat");
+
+            return Ok(userToken);
+        }
+
+        [HttpPost("getUserInfo")]
+        public ActionResult getUserInfo([FromForm] string userToken)
+        {
+            if (!login.ValidateUserToken(userToken)) return BadRequest("Token caducat");
+
+            Encryption encrypt = new Encryption();
+            string tokenDecoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, userToken);
+            string user = tokenDecoded.Split('#')[0];
+
+            string token = login.GetUserInfo(user);
+
+            return Ok(token);
+        }
+    }
+}
+
+
+================================================================================
+FILE: Services/SAPLoginService.cs
+================================================================================
+
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using SAPbobsCOM;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Xml.Linq;
+using XNDmjApi.Functions;
+using XNDmjApi.Models;
+
+namespace XNDmjApi.Services
+{
+    public class SAPLoginService
+    {
+        public Company oCompany;
+
+        public bool ValidateUserToken(string userToken)
+        {
+            try
+            {
+                Encryption encrypt = new Encryption();
+                userToken = encrypt.TokenModify(userToken);
+                string tokenDescodificado = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, userToken);
+                string userName = tokenDescodificado.Split('#')[0];
+                string userCode = tokenDescodificado.Split('#')[1];
+                string date = tokenDescodificado.Split('#')[2];
+
+                // Validar fecha
+                DateTime fechaCaducidad = DateTime.ParseExact(date, "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+                if (DateTime.UtcNow > fechaCaducidad)
+                    return false;
+                else
+                    return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public string LoginByToken(string loginToken)
+        {
+            try
+            {
+                Encryption encrypt = new Encryption();
+                string userToken = "";
+                string encryptedUserToken = "";
+
+                string tokenDecoded = encrypt.AES256_Decrypt(encrypt.AES256_LOGIN_Key, loginToken);
+                string date = tokenDecoded.Split('#')[0];
+                string user = tokenDecoded.Split('#')[1];
+                string password = tokenDecoded.Split('#')[2];
+                string bbdd = tokenDecoded.Split('#')[3];
+
+                // ✅ Guard: no acceptem DB buida (evitem defaults perillosos)
+                if (string.IsNullOrWhiteSpace(bbdd))
+                    return "DB_CONTEXT_MISSING";
+
+                // Validar fecha
+                DateTime loginDate = DateTime.ParseExact(date, "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+                if (DateTime.UtcNow.Subtract(loginDate).TotalSeconds >= 300) // 5 minuts de caducitat
+                {
+                    return "-1";    // -1 = Límite de tiempo excedido
+                }
+
+                // Validar login
+                Dades.COMPANY_SAP = bbdd;
+                Dades.DOMENJO_BBDD = bbdd;
+                Dades.USER_SAP = user;
+                Dades.PWD_SAP = password;
+
+                Dades.SetupDades();
+
+                string result = Dades.CompanyConnect();
+                if (result == "OK")
+                {
+                    oCompany = Dades.oCompany;
+                }
+                else
+                {
+                    return result;
+                }
+
+                if (oCompany != null)
+                {
+                    if (oCompany.Connected == false)
+                    {
+                        Dades.oCompany = oCompany;
+                        return oCompany.GetLastErrorDescription();
+                    }
+                    else
+                    {
+                        Dades.oCompany = oCompany;
+
+                        string jsonUser = GetUserInfo(user);
+
+                        List<mdUsuari> lstjsonUser = (List<mdUsuari>)JsonConvert.DeserializeObject(jsonUser, typeof(List<mdUsuari>));
+
+                        mdUsuari mdUser = lstjsonUser[0];
+
+                        userToken = mdUser.USER_CODE + "#" + mdUser.USERID + "#" + DateTime.UtcNow.AddHours(18).ToString("yyyyMMddHHmmss"); // USER_CODE # USERID # FechaCaducidad
+                        encryptedUserToken = encrypt.AES256_Encrypt(encrypt.AES256_USER_Key, userToken);
+                        return encryptedUserToken;
+                    }
+                }
+                else
+                {
+                    return "No hi ha connexio amb la base de dades!";
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";        // -3 = Error
+            }
+        }
+
+        public string GetUserInfo(string user)
+        {
+            try
+            {
+                string query = @"
+                SELECT
+                    T0.USERID,
+                    T0.USER_CODE,
+                    T0.U_NAME,
+                    T1.govID,
+                    T1.lastName,
+                    T1.firstName,
+                    T0.E_Mail,
+
+                    -- Default group (OUDG)
+                    T0.DfltsGroup       AS DefaultGroupCode,
+                    T2.Name             AS DefaultGroupName,
+
+                    -- ✅ User Group (Authorization Group)
+                    U7.GroupId          AS UserGroupId,
+                    G.GroupName         AS UserGroupName
+
+                FROM OUSR T0
+                LEFT JOIN OHEM T1 ON T0.USERID = T1.userId
+                LEFT JOIN OUDG T2 ON T0.DfltsGroup = T2.Code
+                LEFT JOIN USR7 U7 ON U7.UserId = T0.USERID
+                LEFT JOIN OUGR G  ON G.GroupId = U7.GroupId
+
+                WHERE (T0.USER_CODE = @user OR T1.govID = @user OR T0.E_Mail = @user);
+                ";
+
+                string[] parametres = { $"user:{user}" };
+                DataTable dt = DataAccess.GetDataTable(Dades.ConnectionStringDOMENJO, query, parametres);
+
+                // Afegim SapLicense (si tenim B1Upf.xml disponible)
+                try
+                {
+                    if (dt != null && dt.Rows.Count > 0)
+                    {
+                        if (!dt.Columns.Contains("SapLicense"))
+                            dt.Columns.Add("SapLicense", typeof(string));
+
+                        string userCode = dt.Rows[0]["USER_CODE"]?.ToString() ?? "";
+                        dt.Rows[0]["SapLicense"] = TryGetSapLicenseFromB1Upf(userCode) ?? "";
+                    }
+                }
+                catch
+                {
+                    // No trenquem el login si falla la lectura del B1Upf.xml
+                }
+
+                var jsonUser = JsonConvert.SerializeObject(dt);
+                return jsonUser;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public string GetLoginToken(string user, string password, string bbdd)
+        {
+            Encryption encrypt = new Encryption();
+            string fecha = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            string tokenLogin = encrypt.AES256_Encrypt(encrypt.AES256_LOGIN_Key, fecha + '#' + user + '#' + password + '#' + bbdd);
+            return tokenLogin;
+        }
+
+        public void Release(params object[] objects)
+        {
+            foreach (var obj in objects)
+            {
+                ReleaseOne(obj);
+            }
+        }
+
+        private bool NotComObj(object o)
+        {
+            return !"System.__ComObject".Equals(o.GetType().ToString());
+        }
+
+        private void ReleaseOne(object o)
+        {
+            if (o == null || NotComObj(o))
+            {
+                return;
+            }
+
+            Marshal.ReleaseComObject(o);
+        }
+
+        // ✅ Helper d'autorització per endpoints 'write'
+        // Retorna true si el userToken SAP pertany a grup "Admin" o "Advanced" (USR7/OUGR).
+        public bool IsAdminOrAdvancedFromToken(string userToken)
+        {
+            try
+            {
+                if (!ValidateUserToken(userToken)) return false;
+
+                var encrypt = new Encryption();
+                userToken = encrypt.TokenModify(userToken);
+                string decoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, userToken);
+                var parts = decoded.Split('#');
+                if (parts.Length < 3) return false;
+
+                // Format token SAP: USER_CODE#USERID#yyyyMMddHHmmss
+                if (!int.TryParse(parts[1], out int userId) || userId <= 0) return false;
+
+                // ✅ IMPORTANT: sense context DB NO autoritzem, i NO fem cap fallback a SBO_DOMENJO
+                if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
+                    return false;
+
+                // Ens assegurem de tenir ConnectionStringDOMENJO muntada
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.SetupDades();
+                    if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                        return false;
+                }
+
+                string sql = @"
+                    SELECT G.GroupName
+                    FROM USR7 U7
+                    INNER JOIN OUGR G ON G.GroupId = U7.GroupId
+                    WHERE U7.UserId = @UserId;
+                ";
+
+                var prm = new List<SqlParameter>
+                {
+                    new SqlParameter("@UserId", SqlDbType.Int) { Value = userId }
+                };
+
+                var dt = DataAccess.GetTmpDataTable(Dades.ConnectionStringDOMENJO, sql, prm);
+
+                if (dt == null || dt.Rows.Count == 0) return false;
+
+                foreach (DataRow rr in dt.Rows)
+                {
+                    var g = rr["GroupName"]?.ToString() ?? "";
+                    if (g.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                        g.Equals("Advanced", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // [1B.1] Llegeix el B1Upf.xml i retorna el KeyDesc “principal” per l’usuari
+        private string? TryGetSapLicenseFromB1Upf(string userCode)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userCode)) return null;
+
+                // IMPORTANT: no suposem ruta. La definim per variable d’entorn.
+                // Ex: B1UPF_XML_PATH = C:\...\B1Upf.xml
+                string? path = Environment.GetEnvironmentVariable("B1UPF_XML_PATH");
+                if (string.IsNullOrWhiteSpace(path)) return null;
+                if (!File.Exists(path)) return null;
+
+                var doc = XDocument.Load(path);
+
+                var userNode = doc
+                    .Descendants("User")
+                    .FirstOrDefault(u =>
+                        string.Equals((string?)u.Element("UserName"), userCode, StringComparison.OrdinalIgnoreCase));
+
+                if (userNode == null) return null;
+
+                var keyDescs = userNode
+                    .Descendants("Module")
+                    .Select(m => (string?)m.Element("KeyDesc"))
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Select(s => s!.Trim())
+                    .Distinct()
+                    .ToList();
+
+                if (keyDescs.Count == 0) return null;
+
+                // Preferim una que contingui “SAP Business One”; sinó la primera
+                return keyDescs.FirstOrDefault(x => x.Contains("SAP Business One", StringComparison.OrdinalIgnoreCase))
+                       ?? keyDescs.First();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
+}
+
+
+================================================================================
+FILE: Functions/Login.cs
+================================================================================
+
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using System.Data;
+using XNDmjApi.Models;
+
+namespace XNDmjApi.Functions
+{
+    public class Login
+    {
+
+        //public Login(IConfiguration configuration)
+        //{
+        //    Configuration = configuration;
+        //}
+
+        public string LoginByToken(string loginToken, string role = null)
+        {
+            try
+            {
+                // 0ï¸âƒ£ Assegurem que Dades tÃ© la connexiÃ³ muntada
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                    Dades.SetupDades();
+                }
+
+                Encryption encrypt = new Encryption();
+                string userToken = "";
+                string encryptedUserToken = "";
+
+                string tokenDecoded = encrypt.AES256_Decrypt(encrypt.AES256_LOGIN_Key, loginToken);
+                string date = tokenDecoded.Split('#')[0];
+                string email = tokenDecoded.Split('#')[1];
+                string password = tokenDecoded.Split('#')[2];
+
+                // Validar fecha
+                DateTime loginDate = DateTime.ParseExact(
+                    date,
+                    "yyyyMMddHHmmss",
+                    System.Globalization.CultureInfo.InvariantCulture
+                );
+
+                // 2 hores de caducitat (com abans)
+                if (DateTime.UtcNow.Subtract(loginDate).TotalSeconds >= 7200)
+                {
+                    return "-1";    // -1 = LÃ­mite de tiempo excedido
+                }
+
+                // 1ï¸âƒ£ SQL base
+                string SQL = "SELECT * FROM [dbo].[@XNUSERWEB] WHERE U_Email=@Email AND U_Password=@Password";
+
+                // 2ï¸âƒ£ Si ens han passat role, filtrem tambÃ© per U_Rol
+                if (!string.IsNullOrEmpty(role))
+                {
+                    SQL += " AND U_Rol=@Role";
+                }
+
+                List<SqlParameter> prm = new List<SqlParameter>();
+
+                // @Email com a varchar(250)
+                var pEmail = new SqlParameter("@Email", SqlDbType.VarChar, 250) { Value = email };
+                prm.Add(pEmail);
+
+                // Convertim el hash HEX (EF79...) a byte[] per al varbinary
+                int len = password.Length / 2;
+                byte[] passwordBytes = new byte[len];
+                for (int i = 0; i < len; i++)
+                {
+                    passwordBytes[i] = Convert.ToByte(password.Substring(i * 2, 2), 16);
+                }
+
+                // @Password com a varbinary
+                var pPass = new SqlParameter("@Password", SqlDbType.VarBinary, passwordBytes.Length)
+                {
+                    Value = passwordBytes
+                };
+                prm.Add(pPass);
+
+                // @Role (si ve informat)
+                if (!string.IsNullOrEmpty(role))
+                {
+                    var pRole = new SqlParameter("@Role", SqlDbType.VarChar, 50) { Value = role };
+                    prm.Add(pRole);
+                }
+
+                DataTable dt = DataAccess.GetTmpDataTable(Dades.ConnectionStringDOMENJO, SQL, prm);
+
+                if (dt.Rows.Count > 0)
+                {
+                    // Obtenim el token d'usuari (igual que abans)
+                    userToken = dt.Rows[0]["U_Email"].ToString()
+                              + "#"
+                              + DateTime.UtcNow.AddHours(18).ToString("yyyyMMddHHmmss");
+
+                    encryptedUserToken = encrypt.AES256_Encrypt(encrypt.AES256_USER_Key, userToken);
+                    return encryptedUserToken;
+                }
+                else
+                {
+                    return "-2";    // -2 = Usuario o clave incorrectas (o rol no coincideix)
+                }
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    string logDir = @"C:\Temp";
+                    string logFile = System.IO.Path.Combine(logDir, "DmjApi_Login_Errors.log");
+
+                    System.IO.Directory.CreateDirectory(logDir);
+
+                    System.IO.File.AppendAllText(
+                        logFile,
+                        DateTime.Now.ToString("s") + " - LoginByToken ERROR: " + ex.ToString() + Environment.NewLine
+                    );
+                }
+                catch
+                {
+                    // No fem res si falla el log; no volem trencar encara mÃ©s el login
+                }
+
+                return "-3";        // -3 = Error (mateix contracte amb el client)
+            }
+
+        }
+
+        public string getTokenLogin(string email, string password) 
+        {
+            Encryption encrypt = new Encryption();
+            string fecha = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            string passwordEncrypted = encrypt.GetSHA256(password);
+            string dades = fecha + '#' + email + '#' + passwordEncrypted;
+            string tokenLogin = encrypt.AES256_Encrypt(encrypt.AES256_USER_Key, dades);
+            return tokenLogin;
+        }
+
+        public bool SetPassword(string userToken, string encryptedOldPassword, string encryptedNewPassword)
+        {
+            try
+            {
+                if (!ValidateUserToken(userToken))
+                {
+                    return false;
+                }
+
+        
+                string emailUsuario = this.GetEmailUserFromToken(userToken);
+
+                Encryption encrypt = new Encryption();
+                string oldPassword = encrypt.AES256_Decrypt(encrypt.AES256_LOGIN_Key, encryptedOldPassword);
+                string newPassword = encrypt.AES256_Decrypt(encrypt.AES256_LOGIN_Key, encryptedNewPassword);
+
+
+                List<SqlParameter> SqlParams = new List<SqlParameter>();
+                SqlParameter p = new SqlParameter();
+
+                p = new SqlParameter(); p.ParameterName = "Email"; p.SqlDbType = System.Data.SqlDbType.VarChar; p.SqlValue = emailUsuario; SqlParams.Add(p);
+                p = new SqlParameter(); p.ParameterName = "OldPassword"; p.SqlDbType = System.Data.SqlDbType.VarChar; p.SqlValue = oldPassword; SqlParams.Add(p);
+                p = new SqlParameter(); p.ParameterName = "NewPassword"; p.SqlDbType = System.Data.SqlDbType.VarChar; p.SqlValue = newPassword; SqlParams.Add(p);
+
+                DataTable dt = DataAccess.ExecuteStoredProcedure(Dades.ConnectionStringDOMENJO, "dbo.XN_SetWebUserPassword", SqlParams.ToArray());
+                // Obtener el resultado del SP
+                if (dt.Rows[0][0].ToString() == "1")
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Reset de password via token (caducitat). Token format:
+        ///   AES256_USER_Key( "yyyyMMddHHmmss#email#encryptedNewPassword" )
+        /// on encryptedNewPassword = AES256_LOGIN_Key(password en clar)
+        /// Retorna: OK | TOKEN_EXPIRED | TOKEN_INVALID | USER_NOT_FOUND | DB_CONTEXT_MISSING | <error>
+        /// </summary>
+        public string ResetPasswordByToken(string resetToken)
+        {
+            try
+            {
+                // 0) ConnexiÃ³ DB (mateix patrÃ³ que LoginByToken: assegurem DOMENJO_BBDD si cal)
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+
+                    Dades.SetupDades();
+                }
+
+                if (string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                    return "DB_CONTEXT_MISSING";
+
+                if (string.IsNullOrWhiteSpace(resetToken))
+                    return "TOKEN_INVALID";
+
+                Encryption encrypt = new Encryption();
+
+                // normalitza URL encoding bÃ sic (/%2F/)
+                resetToken = encrypt.TokenModify(resetToken);
+
+                string decoded;
+                try
+                {
+                    decoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, resetToken);
+                }
+                catch
+                {
+                    return "TOKEN_INVALID";
+                }
+
+                // expected: expiry#email#encryptedNewPassword
+                var parts = decoded.Split('#');
+                if (parts.Length < 3)
+                    return "TOKEN_INVALID";
+
+                string expiryStr = parts[0]?.Trim() ?? "";
+                string email = parts[1]?.Trim() ?? "";
+                string encNewPwd = parts[2]?.Trim() ?? "";
+
+                if (string.IsNullOrWhiteSpace(expiryStr) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(encNewPwd))
+                    return "TOKEN_INVALID";
+
+                // caducitat (UTC)
+                DateTime expiryUtc;
+                if (!DateTime.TryParseExact(expiryStr, "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture,
+                                            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                                            out expiryUtc))
+                {
+                    return "TOKEN_INVALID";
+                }
+
+                if (DateTime.UtcNow > expiryUtc)
+                    return "TOKEN_EXPIRED";
+
+                // password en clar (venia xifrat amb AES256_LOGIN_Key)
+                encNewPwd = encrypt.TokenModify(encNewPwd);
+                string newPassword;
+                try
+                {
+                    newPassword = encrypt.AES256_Decrypt(encrypt.AES256_LOGIN_Key, encNewPwd);
+                }
+                catch
+                {
+                    return "TOKEN_INVALID";
+                }
+
+                if (string.IsNullOrWhiteSpace(newPassword))
+                    return "TOKEN_INVALID";
+
+                // update password (hash SHA2_256) a @XNUSERWEB
+                using (var con = new SqlConnection(Dades.ConnectionStringDOMENJO))
+                using (var cmd = con.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                    UPDATE [dbo].[@XNUSERWEB]
+                    SET U_Password = HASHBYTES('SHA2_256', @NewPassword)
+                    WHERE U_Email = @Email;
+                    ";
+                    cmd.Parameters.Add(new SqlParameter("@Email", SqlDbType.VarChar, 250) { Value = email });
+                    cmd.Parameters.Add(new SqlParameter("@NewPassword", SqlDbType.VarChar, 50) { Value = newPassword });
+
+                    con.Open();
+                    int rows = cmd.ExecuteNonQuery();
+                    if (rows == 1)
+                        return "OK";
+
+                    return "USER_NOT_FOUND";
+                }
+            }
+            catch (Exception ex)
+            {
+                // si DataAccess tira "DB_CONTEXT_MISSING" en altres llocs, mantenim coherÃ¨ncia
+                if (ex.Message != null && ex.Message.Contains("DB_CONTEXT_MISSING"))
+                    return "DB_CONTEXT_MISSING";
+
+                return ex.Message ?? "RESET_FAILED";
+            }
+        }
+
+        public bool ValidateUserToken(string userToken)
+        {
+            try
+            {
+                var encrypt = new Encryption();
+                userToken = encrypt.TokenModify(userToken);
+
+                // Pot ser:
+                // - antic:  email#yyyyMMddHHmmss
+                // - SAP:    USER_CODE#USERID#yyyyMMddHHmmss
+                string decoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, userToken);
+                var parts = decoded.Split('#');
+
+                if (parts.Length < 2) return false;
+
+                string fecha = null;
+
+                if (parts.Length >= 3)
+                {
+                    // Token SAP
+                    fecha = parts[2];
+                }
+                else
+                {
+                    // Token antic
+                    fecha = parts[1];
+                }
+
+                DateTime fechaCaducidad = DateTime.ParseExact(
+                    fecha,
+                    "yyyyMMddHHmmss",
+                    System.Globalization.CultureInfo.InvariantCulture
+                );
+
+                return DateTime.UtcNow <= fechaCaducidad;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public string CreateNewUser(string token)
+        {
+            try
+            {
+                // 0ï¸âƒ£ Assegurem que Dades tÃ© la connexiÃ³ muntada
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                    Dades.SetupDades();
+                }
+
+                Encryption encrypt = new Encryption();
+
+                // 1ï¸âƒ£ Desxifrar el token rebut des de Laravel
+                string tokenDecoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, token);
+
+                var parts = tokenDecoded.Split('#');
+                if (parts.Length < 6)
+                {
+                    throw new Exception("Token amb format incorrecte: " + tokenDecoded);
+                }
+
+                string email = parts[0];
+                string dni = parts[1];
+                string password = parts[2];
+                string role = parts[3];
+                string docNum = parts[4];
+                string docDate = parts[5];
+
+                // 2ï¸âƒ£ ParÃ metres per a la SP XN_InsertWebUser
+                List<SqlParameter> SqlParams = new List<SqlParameter>();
+                SqlParameter p;
+
+                p = new SqlParameter("Email", SqlDbType.VarChar) { Value = email }; SqlParams.Add(p);
+                p = new SqlParameter("Password", SqlDbType.VarChar) { Value = password }; SqlParams.Add(p);
+                p = new SqlParameter("DniNifCif", SqlDbType.VarChar) { Value = dni }; SqlParams.Add(p);
+                p = new SqlParameter("Rol", SqlDbType.VarChar) { Value = role }; SqlParams.Add(p);
+                p = new SqlParameter("DocNum", SqlDbType.VarChar) { Value = docNum }; SqlParams.Add(p);
+                p = new SqlParameter("DocDate", SqlDbType.VarChar) { Value = docDate }; SqlParams.Add(p);
+
+                DataTable dt = DataAccess.ExecuteStoredProcedure(
+                    Dades.ConnectionStringDOMENJO,
+                    "dbo.XN_InsertWebUser",
+                    SqlParams.ToArray()
+                );
+
+                if (dt.Rows.Count == 0)
+                    throw new Exception("XN_InsertWebUser no ha retornat cap fila.");
+
+                DataRow row = dt.Rows[0];
+
+                // 3ï¸âƒ£ Llegim la sortida tipificada de la SP: Success / Code / Message
+                bool success = false;
+                string code = null;
+                string message = null;
+
+                if (row.Table.Columns.Contains("Success") && row["Success"] != DBNull.Value)
+                    success = Convert.ToInt32(row["Success"]) == 1;
+
+                if (row.Table.Columns.Contains("Code") && row["Code"] != DBNull.Value)
+                    code = row["Code"]?.ToString();
+
+                if (row.Table.Columns.Contains("Message") && row["Message"] != DBNull.Value)
+                    message = row["Message"]?.ToString();
+
+                if (string.IsNullOrWhiteSpace(code))
+                    code = success ? "OK" : "UNKNOWN";
+
+                if (string.IsNullOrWhiteSpace(message))
+                    message = success
+                        ? "Usuari creat correctament."
+                        : "Error desconegut en XN_InsertWebUser.";
+
+                // 4ï¸âƒ£ Preparem el payload JSON que llegirÃ  Laravel
+                var payload = new
+                {
+                    success = success,
+                    code = code,
+                    message = message
+                };
+
+                // Retornem JSON perquÃ¨ el controlador el pugui enviar directament a Laravel
+                return JsonConvert.SerializeObject(payload);
+            }
+            catch (Exception ex)
+            {
+                // 5ï¸âƒ£ Qualsevol excepciÃ³ inesperada â†’ tambÃ© en format JSON
+                var errorPayload = new
+                {
+                    success = false,
+                    code = "EXCEPTION",
+                    message = ex.Message
+                };
+
+                return JsonConvert.SerializeObject(errorPayload);
+            }
+        }
+
+        private string GetEmailUserFromToken(string token)
+        {
+            Encryption encrypt = new Encryption();
+            token = encrypt.TokenModify(token);
+            string tokenDescodificado = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, token);
+            string emailUsuario = tokenDescodificado.Split('#')[0];
+            return emailUsuario;
+        }
+
+        public User GetUserInfo(string userToken)
+        {
+            Encryption encrypt = new Encryption();
+            userToken = encrypt.TokenModify(userToken);
+            string tokenDescodificado = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, userToken);
+            string emailUsuario = tokenDescodificado.Split('#')[0];
+            //string fecha = tokenDescodificado.Split('#')[1];
+            string SQL = $"SELECT * FROM [dbo].[@XNUSERWEB] WHERE U_Email=@Email";
+
+            List<SqlParameter> prm = new List<SqlParameter>();
+            SqlParameter param = null;
+
+            param = new SqlParameter("@Email", emailUsuario);
+            //param = new SqlParameter("@ItemCode", ItemCode.HasValue ? (object)ItemCode : DBNull.Value);
+            prm.Add(param);
+
+            DataTable dt = DataAccess.GetTmpDataTable(Dades.ConnectionStringDOMENJO, SQL, prm);
+            if (dt.Rows.Count > 0)
+            {
+                User Usuari = new User();
+
+                // Obtenim el token d'usuari
+                userToken = dt.Rows[0]["U_Email"].ToString() + "#" + DateTime.UtcNow.AddHours(18).ToString("yyyyMMddHHmmss");
+                userToken = encrypt.AES256_Encrypt(encrypt.AES256_USER_Key, userToken);
+
+                // Obtenim les dades de l'usuari
+                Usuari.code = int.Parse(dt.Rows[0]["Code"].ToString());
+
+                // Name (camp estÃ ndard de la UDT)
+                if (dt.Columns.Contains("Name") && dt.Rows[0]["Name"] != DBNull.Value)
+                {
+                    Usuari.name = dt.Rows[0]["Name"].ToString();
+                }
+
+                Usuari.email = dt.Rows[0]["U_Email"].ToString();
+                Usuari.userName = dt.Rows[0]["U_UserName"].ToString();
+                Usuari.cardCode = dt.Rows[0]["U_CardCode"].ToString();
+                Usuari.cardName = dt.Rows[0]["U_CardName"].ToString();
+                Usuari.warehouse = dt.Rows[0]["U_Warehouse"].ToString();
+                Usuari.role = dt.Rows[0]["U_Rol"].ToString();
+                Usuari.startDate = DateTime.Parse(dt.Rows[0]["U_StartDate"].ToString());
+                Usuari.expirationDate = DateTime.Parse(dt.Rows[0]["U_ExpirationDate"].ToString());
+                Usuari.isAdmin = dt.Rows[0]["U_IsAdmin"] == DBNull.Value
+                ? "N"
+                : dt.Rows[0]["U_IsAdmin"].ToString();
+                if (dt.Rows[0]["U_LastAccess"] != DBNull.Value)
+                {
+                    Usuari.lastAccess = DateTime.Parse(dt.Rows[0]["U_LastAccess"].ToString());
+                }
+
+                // U_ForgotPassIdentity, si el vols exposar
+                if (dt.Columns.Contains("U_ForgotPassIdentity") && dt.Rows[0]["U_ForgotPassIdentity"] != DBNull.Value)
+                {
+                    Usuari.forgotPassIdentity = dt.Rows[0]["U_ForgotPassIdentity"].ToString();
+                }
+
+                return Usuari;
+
+            }
+            else
+            {
+                return null;    // -2 = Usuario o clave incorrectas
+            }
+        }
+
+        public string AdminInsertWebUser(string adminUserToken,string email,string password,string dniNifCif,int? docNum,DateTime? docDate,string role,string isAdmin)
+        {
+            try
+            {
+                // 0ï¸âƒ£ Assegurem que Dades tÃ© la connexiÃ³ muntada
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+                    Dades.SetupDades();
+                }
+
+                // 1ï¸âƒ£ Validar token i permisos d'empleat (token antic o token SAP)
+                if (!ValidateUserToken(adminUserToken))
+                {
+                    var invalidToken = new
+                    {
+                        success = false,
+                        code = "INVALID_TOKEN",
+                        message = "Token d'usuari no vÃ lid o caducat."
+                    };
+                    return JsonConvert.SerializeObject(invalidToken);
+                }
+
+                // Intentem obtenir info via sistema antic (@XNUSERWEB)
+                var empUser = GetUserInfo(adminUserToken);
+
+                bool isEmployee = false;
+                string empIsAdmin = "N";
+
+                if (empUser != null)
+                {
+                    // Sistema antic
+                    if (empUser.role == "Empleat")
+                    {
+                        isEmployee = true;
+                        empIsAdmin = string.IsNullOrWhiteSpace(empUser.isAdmin) ? "N" : empUser.isAdmin;
+                    }
+                }
+                else
+                {
+                    // Token SAP: USER_CODE#USERID#yyyyMMddHHmmss
+                    try
+                    {
+                        var encrypt = new Encryption();
+                        string tokenFixed = encrypt.TokenModify(adminUserToken);
+                        string decoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, tokenFixed);
+                        var parts = decoded.Split('#');
+                        if (parts.Length >= 3)
+                        {
+                            isEmployee = true;
+
+                            // parts[1] = USERID
+                            int sapUserId = 0;
+                            int.TryParse(parts[1], out sapUserId);
+
+                            // Per defecte, no admin
+                            empIsAdmin = "N";
+
+                            // Si trobem grup Admin o Advanced -> el considerem "admin intranet"
+                            if (sapUserId > 0)
+                            {
+                                try
+                                {
+                                    string sql = @"
+                                        SELECT G.GroupName
+                                        FROM USR7 U7
+                                        INNER JOIN OUGR G ON G.GroupId = U7.GroupId
+                                        WHERE U7.UserId = @UserId;
+                                    ";
+
+                                    var prm = new List<SqlParameter>
+                                    {
+                                        new SqlParameter("@UserId", SqlDbType.Int) { Value = sapUserId }
+                                    };
+
+                                    DataTable dtGrp = DataAccess.GetTmpDataTable(Dades.ConnectionStringDOMENJO, sql, prm);
+
+                                    if (dtGrp != null && dtGrp.Rows.Count > 0 && dtGrp.Columns.Contains("GroupName"))
+                                    {
+                                        foreach (DataRow rr in dtGrp.Rows)
+                                        {
+                                            var g = rr["GroupName"]?.ToString() ?? "";
+                                            if (g.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                                                g.Equals("Advanced", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                empIsAdmin = "Y";
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // no trenquem l'alta per aixÃ²
+                                }
+                            }
+                        }
+
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+
+                if (!isEmployee)
+                {
+                    var notAuth = new
+                    {
+                        success = false,
+                        code = "NOT_AUTHORIZED",
+                        message = "L'usuari no tÃ© permisos d'empleat."
+                    };
+                    return JsonConvert.SerializeObject(notAuth);
+                }
+
+                // âš ï¸ NomÃ©s exigim admin si sâ€™estÃ  creant un usuari EMPLEAT
+                // Amb token SAP, empIsAdmin serÃ  'N' i quedarÃ  bloquejat (que Ã©s el que volem ara).
+                if (string.Equals(role, "Empleat", StringComparison.OrdinalIgnoreCase) && empIsAdmin != "Y")
+                {
+                    var notAuth = new
+                    {
+                        success = false,
+                        code = "NOT_AUTHORIZED",
+                        message = "NomÃ©s un administrador pot crear usuaris Empleat."
+                    };
+                    return JsonConvert.SerializeObject(notAuth);
+                }
+
+
+
+                // 2ï¸âƒ£ Validacions bÃ siques de les dades d'alta
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+                {
+                    var missing = new
+                    {
+                        success = false,
+                        code = "MISSING_DATA",
+                        message = "Cal informar com a mÃ­nim email i password."
+                    };
+                    return JsonConvert.SerializeObject(missing);
+                }
+
+                if (string.IsNullOrWhiteSpace(role))
+                {
+                    var missingRole = new
+                    {
+                        success = false,
+                        code = "MISSING_ROLE",
+                        message = "Cal informar el rol (Client / Empleat)."
+                    };
+                    return JsonConvert.SerializeObject(missingRole);
+                }
+
+                // 3ï¸âƒ£ Normalitzem role i isAdmin (la SP ja forÃ§a isAdmin = 'N' per Clients)
+                string normalizedRole = role;
+                string normalizedIsAdmin = string.IsNullOrWhiteSpace(isAdmin)
+                    ? "N"
+                    : isAdmin.ToUpperInvariant();
+
+                if (normalizedIsAdmin != "Y" && normalizedIsAdmin != "N")
+                {
+                    normalizedIsAdmin = "N";
+                }
+
+                // 4ï¸âƒ£ ConstruÃ¯m els parÃ metres per XN_InsertWebUser
+                var SqlParams = new List<SqlParameter>();
+
+                SqlParams.Add(new SqlParameter("Email", SqlDbType.VarChar, 250) { Value = email });
+                SqlParams.Add(new SqlParameter("Password", SqlDbType.VarChar, 32) { Value = password });
+                SqlParams.Add(new SqlParameter("DniNifCif", SqlDbType.VarChar, 32) { Value = (object)dniNifCif ?? DBNull.Value });
+                SqlParams.Add(new SqlParameter("DocNum", SqlDbType.Int) { Value = (object)docNum ?? DBNull.Value });
+                SqlParams.Add(new SqlParameter("DocDate", SqlDbType.DateTime) { Value = (object)docDate ?? DBNull.Value });
+                SqlParams.Add(new SqlParameter("Rol", SqlDbType.VarChar, 25) { Value = normalizedRole });
+                SqlParams.Add(new SqlParameter("IsAdmin", SqlDbType.Char, 1) { Value = normalizedIsAdmin });
+
+                DataTable dt = DataAccess.ExecuteStoredProcedure(
+                    Dades.ConnectionStringDOMENJO,
+                    "dbo.XN_InsertWebUser",
+                    SqlParams.ToArray()
+                );
+
+                if (dt.Rows.Count == 0)
+                {
+                    var noRow = new
+                    {
+                        success = false,
+                        code = "NO_RESULT",
+                        message = "XN_InsertWebUser no ha retornat cap fila."
+                    };
+                    return JsonConvert.SerializeObject(noRow);
+                }
+
+                DataRow row = dt.Rows[0];
+
+                bool success = false;
+                string code = null;
+                string message = null;
+
+                if (row.Table.Columns.Contains("Success") && row["Success"] != DBNull.Value)
+                    success = Convert.ToInt32(row["Success"]) == 1;
+
+                if (row.Table.Columns.Contains("Code") && row["Code"] != DBNull.Value)
+                    code = row["Code"]?.ToString();
+
+                if (row.Table.Columns.Contains("Message") && row["Message"] != DBNull.Value)
+                    message = row["Message"]?.ToString();
+
+                if (string.IsNullOrWhiteSpace(code))
+                    code = success ? "OK" : "UNKNOWN";
+
+                if (string.IsNullOrWhiteSpace(message))
+                    message = success
+                        ? "Usuari creat correctament."
+                        : "Error desconegut en XN_InsertWebUser.";
+
+                var payload = new
+                {
+                    success = success,
+                    code = code,
+                    message = message
+                };
+
+                return JsonConvert.SerializeObject(payload);
+            }
+            catch (Exception ex)
+            {
+                var errorPayload = new
+                {
+                    success = false,
+                    code = "EXCEPTION",
+                    message = ex.Message
+                };
+
+                return JsonConvert.SerializeObject(errorPayload);
+            }
+        }
+
+    }
+}
+
+
+================================================================================
+FILE: Functions/Encryption.cs
+================================================================================
+
+using System.Security.Cryptography;
+using System.Text;
+
+namespace XNDmjApi.Functions
+{
+    public class Encryption
+    {
+        
+        public string AES256_LOGIN_Key = "GQyyLAV36KVz4QzgMWqysbS4/tNaSQ0i";
+        public string AES256_USER_Key = "X3xnEHoSRR5O/MASuejASzhT0jYw/7Nj";
+
+        public string GetSHA256(string str)
+        {
+            SHA256 sha256 = SHA256.Create();
+            ASCIIEncoding encoding = new ASCIIEncoding();
+            byte[] stream = null;
+            StringBuilder sb = new StringBuilder();
+            stream = sha256.ComputeHash(encoding.GetBytes(str));
+            for (int i = 0; i < stream.Length; i++) sb.AppendFormat("{0:X2}", stream[i]);
+            return sb.ToString();
+        }
+
+        public string AES256_Encrypt(string key, string texto)
+        {
+            byte[] iv = new byte[16];
+            byte[] array;
+
+            using (Aes aes = Aes.Create())
+            {
+                aes.Key = Encoding.UTF8.GetBytes(key);
+                aes.IV = iv;
+
+                ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+
+                using (MemoryStream memoryStream = new MemoryStream())
+                {
+                    using (CryptoStream cryptoStream = new CryptoStream((Stream)memoryStream, encryptor, CryptoStreamMode.Write))
+                    {
+                        using (StreamWriter streamWriter = new StreamWriter((Stream)cryptoStream))
+                        {
+                            streamWriter.Write(texto);
+                        }
+
+                        array = memoryStream.ToArray();
+                    }
+                }
+            }
+
+            return Convert.ToBase64String(array);
+        }
+
+        public string AES256_Decrypt(string key, string textoCifrado)
+        {
+            byte[] iv = new byte[16];
+            byte[] buffer = Convert.FromBase64String(textoCifrado);
+
+            using (Aes aes = Aes.Create())
+            {
+                aes.Key = Encoding.UTF8.GetBytes(key);
+                aes.IV = iv;
+                ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+
+                using (MemoryStream memoryStream = new MemoryStream(buffer))
+                {
+                    using (CryptoStream cryptoStream = new CryptoStream((Stream)memoryStream, decryptor, CryptoStreamMode.Read))
+                    {
+                        using (StreamReader streamReader = new StreamReader((Stream)cryptoStream))
+                        {
+                            return streamReader.ReadToEnd();
+                        }
+                    }
+                }
+            }
+        }
+
+        public string TokenModify(string token)
+        {
+            return token.Replace("%2F", "/");
+        }
+        
+    }
+}
+
+
+================================================================================
+FILE: Functions/Dades.cs
+================================================================================
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using SAPbobsCOM;
+using XNDmjApi.Models;
+
+namespace XNDmjApi.Functions
+{
+    public static class Dades
+    {
+        public static Company oCompany { get; set; }
+
+        public static string SERVER_SQL { get; set; }
+        public static string USER_SQL { get; set; }
+        public static string PWD_SQL { get; set; }
+
+        public static string DOMENJO_BBDD { get; set; }
+        public static string COMMON_BBDD { get; set; }
+        public static string PROPIES_BBDD { get; set; }
+
+        public static string COMPANY_SAP { get; set; }
+        public static string USER_SAP { get; set; }
+        public static string PWD_SAP { get; set; }
+
+        public static string ConnectionStringCOMMON { get; set; }
+        public static string ConnectionStringDOMENJO { get; set; }
+        public static string ConnectionStringPROPIES { get; set; }
+        public static string DOMEDOC_IMAGES_ROOT { get; set; }
+        public static string DOMEDOC_TECHNICALSHEETS_ROOT { get; set; }
+
+        public static void SetupDades()
+        {
+            USER_SQL = ApplicationSettings.MSSQL_USER;
+            PWD_SQL = ApplicationSettings.MSSQL_PWD;
+            SERVER_SQL = ApplicationSettings.MSSQL_SRV;
+            COMMON_BBDD = ApplicationSettings.COMMON_BBDD;
+            PROPIES_BBDD = ApplicationSettings.PROPIES_BBDD;
+
+            // IMPORTANT (seguretat): NO fem fallback a SBO_DOMENJO.
+            // La DB DOMENJO_BBDD s’ha de fixar des del context SAP (login).
+            // Si no hi ha context, ConnectionStringDOMENJO queda buit i els endpoints han de retornar DB_CONTEXT_MISSING.
+            if (string.IsNullOrWhiteSpace(DOMENJO_BBDD))
+            {
+                ConnectionStringDOMENJO = "";
+            }
+            else
+            {
+                ConnectionStringDOMENJO =
+                    $"Data Source={SERVER_SQL};Initial Catalog={DOMENJO_BBDD};User ID={USER_SQL};Password={PWD_SQL}; TrustServerCertificate=True;";
+            }
+
+            ConnectionStringCOMMON =
+                $"Data Source={SERVER_SQL};Initial Catalog={COMMON_BBDD};User ID={USER_SQL};Password={PWD_SQL}; TrustServerCertificate=True;";
+
+            ConnectionStringPROPIES =
+                $"Data Source={SERVER_SQL};Initial Catalog={PROPIES_BBDD};User ID={USER_SQL};Password={PWD_SQL}; TrustServerCertificate=True;";
+
+            // 🔹 Arrel genèrica de documents/imatges al NAS
+            DOMEDOC_IMAGES_ROOT = @"\\10.10.60.13\imatgesweb";
+            DOMEDOC_TECHNICALSHEETS_ROOT = @"\\10.10.60.13\fitxes_tecniques";
+        }
+
+        public static string CompanyConnect()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(DOMENJO_BBDD))
+                    return "DB_CONTEXT_MISSING";
+
+                if (string.IsNullOrWhiteSpace(SERVER_SQL) ||
+                    string.IsNullOrWhiteSpace(USER_SQL) ||
+                    string.IsNullOrWhiteSpace(PWD_SQL) ||
+                    string.IsNullOrWhiteSpace(USER_SAP) ||
+                    string.IsNullOrWhiteSpace(PWD_SAP))
+                {
+                    return "SAP_CONNECT_CONFIG_MISSING";
+                }
+
+                var company = new Company
+                {
+                    Server = SERVER_SQL,
+                    UseTrusted = false,
+                    UserName = USER_SAP,
+                    Password = PWD_SAP,
+                    language = BoSuppLangs.ln_Spanish,
+                    DbServerType = BoDataServerTypes.dst_MSSQL2019,
+                    CompanyDB = DOMENJO_BBDD,
+                    DbUserName = USER_SQL,
+                    DbPassword = PWD_SQL
+                };
+
+                if (company.Connect() == 0)
+                {
+                    Dades.oCompany = company;
+                    return "OK";
+                }
+
+                return company.GetLastErrorDescription();
+            }
+            catch (System.Exception ex)
+            {
+                return $"Error desconegut: {ex.Message}";
+            }
+        }
+    }
+}
+

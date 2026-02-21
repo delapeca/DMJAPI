@@ -1,0 +1,1293 @@
+﻿XNApiRest/
+├── QrMulti
+│   ├── Services
+│   │   ├── QrTokenGenerator.cs
+│   │   └── QrMultiDbInitializer.cs
+│   ├── Models
+│   │   ├── QrManifest.cs
+│   │   └── QrDevice.cs
+│   └── Dtos
+│       ├── QrMultiResponse.cs
+│       └── QrMultiCreateRequest.cs
+├── Properties
+│   ├── PublishProfiles
+│   │   ├── FolderProfile.pubxml.user
+│   │   └── FolderProfile.pubxml
+│   └── launchSettings.json
+├── obj
+│   ├── Release
+│   │   └── net8.0
+│   │       ├── refint
+│   │       │   └── XNDmjApi.dll
+│   │       ├── staticwebassets
+│   │       ├── PubTmp
+│   │       │   └── Out
+│   │       │       ├── ru
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── runtimes
+│   │       │       │   ├── osx-arm64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.dylib
+│   │       │       │   ├── osx-x64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.dylib
+│   │       │       │   ├── osx
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libSkiaSharp.dylib
+│   │       │       │   ├── maccatalyst-arm64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.dylib
+│   │       │       │   ├── maccatalyst-x64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.dylib
+│   │       │       │   ├── unix
+│   │       │       │   │   └── lib
+│   │       │       │   │       └── net8.0
+│   │       │       │   │           └── Microsoft.Data.SqlClient.dll
+│   │       │       │   ├── win-x64
+│   │       │       │   │   └── native
+│   │       │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │       │   │       ├── libSkiaSharp.dll
+│   │       │       │   │       └── e_sqlite3.dll
+│   │       │       │   ├── win-x86
+│   │       │       │   │   └── native
+│   │       │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │       │   │       ├── libSkiaSharp.dll
+│   │       │       │   │       └── e_sqlite3.dll
+│   │       │       │   ├── win-arm64
+│   │       │       │   │   └── native
+│   │       │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │       │   │       ├── libSkiaSharp.dll
+│   │       │       │   │       └── e_sqlite3.dll
+│   │       │       │   ├── win
+│   │       │       │   │   └── lib
+│   │       │       │   │       └── net8.0
+│   │       │       │   │           ├── System.Runtime.Caching.dll
+│   │       │       │   │           ├── Microsoft.Win32.SystemEvents.dll
+│   │       │       │   │           └── Microsoft.Data.SqlClient.dll
+│   │       │       │   ├── win-arm
+│   │       │       │   │   └── native
+│   │       │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │       │   │       └── e_sqlite3.dll
+│   │       │       │   ├── linux-x86
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-armel
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-mips64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-arm64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── browser-wasm
+│   │       │       │   │   └── nativeassets
+│   │       │       │   │       └── net8.0
+│   │       │       │   │           └── e_sqlite3.a
+│   │       │       │   ├── linux-arm
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-musl-arm
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-s390x
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-x64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-ppc64le
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   ├── linux-musl-arm64
+│   │       │       │   │   └── native
+│   │       │       │   │       └── libe_sqlite3.so
+│   │       │       │   └── linux-musl-x64
+│   │       │       │       └── native
+│   │       │       │           └── libe_sqlite3.so
+│   │       │       ├── pt-BR
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── Querys
+│   │       │       │   ├── GetSalesOrdersSummary.sql
+│   │       │       │   ├── GetSalesOrdersDetail.sql
+│   │       │       │   ├── GetSalesReturnDetail.sql
+│   │       │       │   ├── GetTemporalGoodsReceipt.sql
+│   │       │       │   ├── GetSalesReturnsSummary.sql
+│   │       │       │   ├── GetSalesOffersSummary.sql
+│   │       │       │   ├── GetSalesDeliveryNotesSummary.sql
+│   │       │       │   ├── GetSalesDeliveryNoteDetail.sql
+│   │       │       │   ├── GetSalesInvoiceDetail.sql
+│   │       │       │   ├── GetSalesOfferDetail.sql
+│   │       │       │   ├── GetSalesInvoicesSummary.sql
+│   │       │       │   ├── SetupOperaris_GetDetail.sql
+│   │       │       │   ├── SetupOperaris_Create.sql
+│   │       │       │   ├── SetupOperaris_GetList.sql
+│   │       │       │   ├── SetupOperaris_Update.sql
+│   │       │       │   ├── SetupOperaris_SetActive.sql
+│   │       │       │   ├── SetupObres_UpdateOpenFields.sql
+│   │       │       │   ├── SetupObres_Create.sql
+│   │       │       │   ├── GetTreeItem.sql
+│   │       │       │   ├── SetupObres_GetDetail.sql
+│   │       │       │   ├── SetupObres_SetActive.sql
+│   │       │       │   ├── SetupObres_GetList.sql
+│   │       │       │   ├── GetItemsGroups.sql
+│   │       │       │   ├── GetItems.sql
+│   │       │       │   ├── GetItemsPurchasedSummary.sql
+│   │       │       │   ├── GetItemsSubGroups.sql
+│   │       │       │   ├── GetItemsSalesPrices.sql
+│   │       │       │   ├── GetItemPurchasedHistory.sql
+│   │       │       │   ├── GetBusinessPartnersWithOpenPurcharseOrders.sql
+│   │       │       │   ├── GetBusinessPartners.sql
+│   │       │       │   ├── GetClientProfile.sql
+│   │       │       │   ├── GetItem.sql
+│   │       │       │   ├── GetCustomerReceiptsSummary.sql
+│   │       │       │   ├── GetOutletItemsBySubGroup.sql
+│   │       │       │   ├── GetOutletItemImage.sql
+│   │       │       │   ├── GetOutletSubGroups.sql
+│   │       │       │   ├── GetProductTree.sql
+│   │       │       │   ├── GetOutletSubGroupsByGroup.sql
+│   │       │       │   ├── GetOutletItemByCode.sql
+│   │       │       │   ├── GetOpenPurcharseOrdersFromBP.sql
+│   │       │       │   ├── GetOpenPurcharseOrderFromBP.sql
+│   │       │       │   ├── GetOpenPurchaseOrder.sql
+│   │       │       │   ├── GetOutletGroups.sql
+│   │       │       │   └── GetOpenPurchaseOrders.sql
+│   │       │       ├── zh-Hans
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── zh-Hant
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── tr
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── wwwroot
+│   │       │       │   └── swagger-apikey-dev.js
+│   │       │       ├── pl
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── de
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── es
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── App_Data
+│   │       │       │   └── qrloxone.db
+│   │       │       ├── cs
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── ja
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── ko
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── fr
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── it
+│   │       │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       │       ├── Swashbuckle.AspNetCore.SwaggerGen.dll
+│   │       │       ├── Swashbuckle.AspNetCore.SwaggerUI.dll
+│   │       │       ├── Swashbuckle.AspNetCore.Filters.dll
+│   │       │       ├── Swashbuckle.AspNetCore.Swagger.dll
+│   │       │       ├── System.Composition.Convention.dll
+│   │       │       ├── System.Composition.Hosting.dll
+│   │       │       ├── System.CodeDom.dll
+│   │       │       ├── System.Composition.AttributedModel.dll
+│   │       │       ├── Scrutor.dll
+│   │       │       ├── SkiaSharp.dll
+│   │       │       ├── Newtonsoft.Json.dll
+│   │       │       ├── QRCoder.dll
+│   │       │       ├── SQLitePCLRaw.provider.e_sqlite3.dll
+│   │       │       ├── Swashbuckle.AspNetCore.Filters.Abstractions.dll
+│   │       │       ├── SQLitePCLRaw.batteries_v2.dll
+│   │       │       ├── SQLitePCLRaw.core.dll
+│   │       │       ├── System.Composition.Runtime.dll
+│   │       │       ├── XNDmjApi.deps.json
+│   │       │       ├── XNDmjApi.dll
+│   │       │       ├── System.Security.Cryptography.ProtectedData.dll
+│   │       │       ├── web.config
+│   │       │       ├── XNDmjApi.runtimeconfig.json
+│   │       │       ├── XNDmjApi.staticwebassets.endpoints.json
+│   │       │       ├── XNDmjApi.exe
+│   │       │       ├── XNDmjApi.pdb
+│   │       │       ├── System.Drawing.Common.dll
+│   │       │       ├── System.IdentityModel.Tokens.Jwt.dll
+│   │       │       ├── System.Composition.TypedParts.dll
+│   │       │       ├── System.Configuration.ConfigurationManager.dll
+│   │       │       ├── System.Private.Windows.GdiPlus.dll
+│   │       │       ├── System.Runtime.Caching.dll
+│   │       │       ├── System.Memory.Data.dll
+│   │       │       ├── System.Private.Windows.Core.dll
+│   │       │       ├── Mono.TextTemplating.dll
+│   │       │       ├── Microsoft.CodeAnalysis.CSharp.dll
+│   │       │       ├── Microsoft.CodeAnalysis.CSharp.Workspaces.dll
+│   │       │       ├── Microsoft.AspNetCore.Authentication.JwtBearer.dll
+│   │       │       ├── Microsoft.Bcl.AsyncInterfaces.dll
+│   │       │       ├── Microsoft.Data.SqlClient.dll
+│   │       │       ├── Microsoft.Data.Sqlite.dll
+│   │       │       ├── Microsoft.CodeAnalysis.dll
+│   │       │       ├── Microsoft.CodeAnalysis.Workspaces.dll
+│   │       │       ├── Azure.Core.dll
+│   │       │       ├── Azure.Identity.dll
+│   │       │       ├── appsettings.Development.json
+│   │       │       ├── appsettings.json
+│   │       │       ├── crq_update_lines.json
+│   │       │       ├── Humanizer.dll
+│   │       │       ├── body_update_lines.json
+│   │       │       ├── crq_create.json
+│   │       │       ├── Microsoft.EntityFrameworkCore.Abstractions.dll
+│   │       │       ├── Microsoft.IdentityModel.Protocols.dll
+│   │       │       ├── Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+│   │       │       ├── Microsoft.IdentityModel.JsonWebTokens.dll
+│   │       │       ├── Microsoft.IdentityModel.Logging.dll
+│   │       │       ├── Microsoft.SqlServer.Server.dll
+│   │       │       ├── Microsoft.Win32.SystemEvents.dll
+│   │       │       ├── Microsoft.IdentityModel.Tokens.dll
+│   │       │       ├── Microsoft.OpenApi.dll
+│   │       │       ├── Microsoft.EntityFrameworkCore.Relational.dll
+│   │       │       ├── Microsoft.EntityFrameworkCore.Sqlite.dll
+│   │       │       ├── Microsoft.EntityFrameworkCore.Design.dll
+│   │       │       ├── Microsoft.EntityFrameworkCore.dll
+│   │       │       ├── Microsoft.Identity.Client.Extensions.Msal.dll
+│   │       │       ├── Microsoft.IdentityModel.Abstractions.dll
+│   │       │       ├── Microsoft.Extensions.DependencyModel.dll
+│   │       │       └── Microsoft.Identity.Client.dll
+│   │       ├── ref
+│   │       │   └── XNDmjApi.dll
+│   │       ├── XNDmjApi.csproj.ResolveComReference.cache
+│   │       ├── XNDmjApi.csproj.FileListAbsolute.txt
+│   │       ├── XNDmjApi.dll
+│   │       ├── XNDmjApi.deps.json
+│   │       ├── XNDmjApi.assets.cache
+│   │       ├── XNDmjApi.AssemblyInfoInputs.cache
+│   │       ├── XNDmjApi.csproj.CoreCompileInputs.cache
+│   │       ├── XNDmjApi.csproj.AssemblyReference.cache
+│   │       ├── XNDmjApi.MvcApplicationPartsAssemblyInfo.cs
+│   │       ├── XNDmjApi.MvcApplicationPartsAssemblyInfo.cache
+│   │       ├── XNDmjApi.sourcelink.json
+│   │       ├── XNDmjApi.pdb
+│   │       ├── XNDmjApi.genpublishdeps.cache
+│   │       ├── XNDmjApi.GeneratedMSBuildEditorConfig.editorconfig
+│   │       ├── XNDmjApi.GlobalUsings.g.cs
+│   │       ├── XNDmjApi.genruntimeconfig.cache
+│   │       ├── XNDmjApi.AssemblyInfo.cs
+│   │       ├── rjsmrazor.dswa.cache.json
+│   │       ├── rjsmcshtml.dswa.cache.json
+│   │       ├── staticwebassets.build.endpoints.json
+│   │       ├── rpswa.dswa.cache.json
+│   │       ├── Interop.SAPbobsCOM.dll
+│   │       ├── apphost.exe
+│   │       ├── rjimswa.dswa.cache.json
+│   │       ├── PublishOutputs.73238ddad2.txt
+│   │       ├── staticwebassets.references.upToDateCheck.txt
+│   │       ├── staticwebassets.publish.json
+│   │       ├── staticwebassets.upToDateCheck.txt
+│   │       ├── staticwebassets.removed.txt
+│   │       ├── staticwebassets.build.json.cache
+│   │       ├── staticwebassets.build.json
+│   │       ├── staticwebassets.publish.endpoints.json
+│   │       └── staticwebassets.development.json
+│   ├── Debug
+│   │   └── net8.0
+│   │       ├── refint
+│   │       │   └── XNDmjApi.dll
+│   │       ├── staticwebassets
+│   │       ├── EndpointInfo
+│   │       │   ├── XNDmjApi.OpenApiFiles.cache
+│   │       │   └── XNDmjApi.json
+│   │       ├── ref
+│   │       │   └── XNDmjApi.dll
+│   │       ├── XNDmjApi.csproj.FileListAbsolute.txt
+│   │       ├── XNDmjApi.csproj.ResolveComReference.cache
+│   │       ├── XNDmjApi.csproj.Up2Date
+│   │       ├── XNDmjApi.csproj.CoreCompileInputs.cache
+│   │       ├── XNDmjApi.assets.cache
+│   │       ├── XNDmjApi.csproj.AssemblyReference.cache
+│   │       ├── XNDmjApi.csproj.BuildWithSkipAnalyzers
+│   │       ├── XNDmjApi.dll
+│   │       ├── XNDmjApi.MvcApplicationPartsAssemblyInfo.cs
+│   │       ├── XNDmjApi.pdb
+│   │       ├── XNDmjApi.sourcelink.json
+│   │       ├── XNDmjApi.MvcApplicationPartsAssemblyInfo.cache
+│   │       ├── XNDmjApi.GeneratedMSBuildEditorConfig.editorconfig
+│   │       ├── XNDmjApi.genruntimeconfig.cache
+│   │       ├── XNDmjApi.GlobalUsings.g.cs
+│   │       ├── XNDmjApi.AssemblyInfoInputs.cache
+│   │       ├── rjsmcshtml.dswa.cache.json
+│   │       ├── rjsmrazor.dswa.cache.json
+│   │       ├── rpswa.dswa.cache.json
+│   │       ├── rjimswa.dswa.cache.json
+│   │       ├── ApiEndpoints.json
+│   │       ├── apphost.exe
+│   │       ├── Interop.SAPbobsCOM.dll
+│   │       ├── staticwebassets.build.endpoints.json
+│   │       ├── staticwebassets.removed.txt
+│   │       ├── staticwebassets.upToDateCheck.txt
+│   │       ├── XNDmjApi.AssemblyInfo.cs
+│   │       ├── staticwebassets.references.upToDateCheck.txt
+│   │       ├── staticwebassets.build.json
+│   │       ├── staticwebassets.build.json.cache
+│   │       └── staticwebassets.development.json
+│   ├── XNDmjApi.csproj.nuget.g.props
+│   ├── XNDmjApi.csproj.nuget.g.targets
+│   ├── XNDmjApi.csproj.nuget.dgspec.json
+│   ├── project.assets.json
+│   └── project.nuget.cache
+├── Querys
+│   ├── GetSalesOrdersSummary.sql
+│   ├── GetSalesOrdersDetail.sql
+│   ├── GetSalesOffersSummary.sql
+│   ├── GetTemporalGoodsReceipt.sql
+│   ├── GetSalesReturnsSummary.sql
+│   ├── GetSalesReturnDetail.sql
+│   ├── GetSalesDeliveryNotesSummary.sql.bak_20260121_125846
+│   ├── GetSalesDeliveryNotesSummary.sql.bak_20260121_112333
+│   ├── GetSalesDeliveryNotesSummary.sql
+│   ├── GetSalesOfferDetail.sql
+│   ├── GetSalesInvoicesSummary.sql
+│   ├── GetSalesInvoiceDetail.sql
+│   ├── SetupOperaris_GetList.sql
+│   ├── SetupOperaris_GetDetail.sql
+│   ├── SetupOperaris_Create.sql
+│   ├── TextFile.txt
+│   ├── SetupOperaris_Update.sql
+│   ├── SetupOperaris_SetActive.sql
+│   ├── SetupObres_GetDetail.sql
+│   ├── SetupObres_Create.sql
+│   ├── GetTreeItem.sql
+│   ├── SetupObres_UpdateOpenFields.sql
+│   ├── SetupObres_SetActive.sql
+│   ├── SetupObres_GetList.sql
+│   ├── GetItemsGroups.sql
+│   ├── GetItems.sql
+│   ├── GetItemPurchasedHistory.sql
+│   ├── GetItemsSubGroups.sql
+│   ├── GetItemsSalesPrices.sql
+│   ├── GetItemsPurchasedSummary.sql
+│   ├── GetClientProfile.sql
+│   ├── GetBusinessPartnersWithOpenPurcharseOrders.sql
+│   ├── GetBusinessPartners.sql
+│   ├── GetItem.sql
+│   ├── GetCustomerReceiptsSummary.sql
+│   ├── GetClientProfile.sql.bak_20260123_182724
+│   ├── GetOutletSubGroups.sql
+│   ├── GetOutletItemsBySubGroup.sql
+│   ├── GetOutletItemImage.sql
+│   ├── GetSalesDeliveryNoteDetail.sql
+│   ├── GetProductTree.sql
+│   ├── GetOutletSubGroupsByGroup.sql
+│   ├── GetOpenPurchaseOrder.sql
+│   ├── GetOpenPurcharseOrdersFromBP.sql
+│   ├── GetOpenPurcharseOrderFromBP.sql
+│   ├── GetOutletItemByCode.sql
+│   ├── GetOutletGroups.sql
+│   └── GetOpenPurchaseOrders.sql
+├── wwwroot
+│   └── swagger-apikey-dev.js
+├── Tools
+│   └── DmjDbMigrations
+├── Services
+│   ├── SapChangeRequestsUdoService.cs.bak_20260205_090107
+│   ├── SapChangeRequestsUdoService.cs.bak_20260205_085448
+│   ├── SapChangeRequestsUdoService.cs.bak_20260205_084411
+│   ├── SapChangeRequestsUdoService.cs.bak_20260214_171158
+│   ├── SapChangeRequestsUdoService.cs.bak_20260213_210806
+│   ├── SapChangeRequestsUdoService.cs.bak_20260213_210550
+│   ├── SapChangeRequestsUdoService.cs.bak_20260204_103223
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_105910
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_103703
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_093406
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_144250
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_130440
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_112633
+│   ├── SapChangeRequestsUdoSetupService.cs
+│   ├── SqlSchemaService.cs.bak_20260127_152225
+│   ├── SqlSchemaService.cs
+│   ├── SapMailQueueService.cs
+│   ├── SqlSchemaSetupService.cs
+│   ├── SqlSchemaService.cs.bak_20260128_072634
+│   ├── SqlSchemaService.cs.bak_20260128_072550
+│   ├── SAPLoginService.cs.bak_20260128_072634
+│   ├── SAPLoginService.cs.bak_20260124_102927
+│   ├── SAPLoginService.cs
+│   ├── SapItemMediaService.cs
+│   ├── SAPLoginService.cs.bak_20260128_072550
+│   ├── SAPLoginService.cs.bak_20260127_072330
+│   ├── SAPLoginService.cs.bak_20260124_115529
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_072422
+│   ├── ItemsGroupsService.cs
+│   ├── ItemMediaService.cs
+│   ├── IntranetSetupOperarisService.cs
+│   ├── NasService.cs
+│   ├── ItemsService.cs
+│   ├── ItemsPurchasedService.cs
+│   ├── IntranetSetupObresService.cs
+│   ├── ClientContactsService.cs
+│   ├── ClientAddressesService.cs
+│   ├── BoyumEmailService.cs
+│   ├── GoodsReceiptService.cs
+│   ├── CustomerPortfolioService.cs
+│   ├── ClientProfileService.cs
+│   ├── OutletService.cs
+│   ├── SapChangeRequestsService.cs.bak_20260203_071947
+│   ├── SapChangeRequestsService.cs
+│   ├── SapBusinessPartnerService.cs
+│   ├── SapChangeRequestsUdoService.cs.bak_20260203_071545
+│   ├── SapChangeRequestsUdoService.cs.bak_20260202_165939
+│   ├── SapChangeRequestsUdoService.cs
+│   ├── SapBusinessPartnerContactService.cs
+│   ├── SalesInvoicesService.cs
+│   ├── SalesDeliveryNotesService.cs
+│   ├── SalesCreditNotesService.cs
+│   ├── SalesReturnsService.cs
+│   ├── SalesOrdersService.cs
+│   └── SalesOffersService.cs
+├── Models
+│   ├── DbSetup
+│   │   └── DbSetupModels.cs
+│   ├── MailQueue
+│   │   └── MailQueueEnqueueRequest.cs
+│   ├── Portfolio
+│   │   ├── ReceiptSummaryRequest.cs
+│   │   └── ReceiptSummaryDto.cs
+│   ├── ChangeRequests
+│   │   ├── ChangeRequestListItemDto.cs
+│   │   ├── ChangeRequestListResponse.cs
+│   │   ├── ChangeRequestPagingDto.cs
+│   │   ├── ChangeRequestLineItemDto.cs
+│   │   ├── ChangeRequestContactDtos.cs
+│   │   ├── ChangeRequestDetailDto.cs
+│   │   └── ChangeRequestGetResponse.cs
+│   ├── ChangeRequestsUdo
+│   │   ├── SapChangeRequestsUdoContracts.cs.bak_20260202_165939
+│   │   ├── SapChangeRequestsUdoContracts.cs.bak_20260203_111854
+│   │   ├── SapChangeRequestsUdoContracts.cs
+│   │   └── SapChangeRequestsUdoContracts.cs.bak_20260202_162812
+│   ├── ClientProfile
+│   │   ├── ClientProfileRequest.cs
+│   │   └── ClientProfileDto.cs
+│   ├── SqlSchemaSpec.cs.bak_20260128_072550
+│   ├── SqlSchemaSpec.cs
+│   ├── ProcessItemMediaResponse.cs
+│   ├── User.cs
+│   ├── UdfDefinition.cs
+│   ├── SqlSchemaSpec.cs.bak_20260128_072634
+│   ├── mdGoodsReceipt.cs
+│   ├── ItemMediaInfoResponse.cs
+│   ├── ApplicationSettings.cs
+│   ├── ProcessItemMediaRequest.cs
+│   ├── mdUsuari.cs
+│   └── mdTemporalGoodReceipt.cs
+├── Controllers
+│   ├── IntranetSetup
+│   │   ├── ObresController.cs
+│   │   ├── ClientsSelfController.cs.bak_20260205_151800
+│   │   ├── ClientsSelfController.cs.bak_20260124_100008
+│   │   ├── OperarisController.cs.backup_20260210_125545
+│   │   ├── OperarisController.cs
+│   │   ├── ObresController.cs.backup_20260210_125545
+│   │   ├── ClientsSelfController.cs.bak_20260124_095427
+│   │   ├── ClientsSelfController.cs.bak_20260124_085804
+│   │   ├── ClientsSelfController.cs.bak_20260123_205803
+│   │   ├── ClientsSelfController.cs
+│   │   ├── ClientsSelfController.cs.bak_20260124_094855
+│   │   ├── ClientsSelfController.cs.bak_20260124_094702
+│   │   └── ClientsSelfController.cs.bak_20260124_090317
+│   ├── SalesDeliveryNotesController.cs
+│   ├── SalesDeliveryNotesController.cs.backup_20260210_125436
+│   ├── SalesCreditNotesController.cs.backup_20260210_125545
+│   ├── QrResolveController.cs.bak_20260205_151800
+│   ├── SalesCreditNotesController.cs
+│   ├── SalesDeliveryNotesController.cs.backup_20260210_125451
+│   ├── SalesOffersController.cs
+│   ├── SalesOrdersController.cs
+│   ├── SalesInvoicesController.cs.backup_20260210_125545
+│   ├── SalesDeliveryNotesController.cs.backup_20260210_125545
+│   ├── SalesInvoicesController.cs
+│   ├── QrResolveController.cs.bak_20260109_204517
+│   ├── QRController.Loxone.Tokens.cs
+│   ├── QRController.Loxone.Tokens.cs.bak_20260109_165831
+│   ├── QRController.Loxone.cs.bak_20260205_151800
+│   ├── QRController.Loxone.cs.bak_20260117_084023
+│   ├── QRController.Loxone.cs.bak_20260117_084445
+│   ├── QrMultiAdminController.cs
+│   ├── QrResolveController.cs
+│   ├── QrResolveController.cs.bak_20260109_203436
+│   ├── QrMultiAdminController.cs.bak_20260205_151800
+│   ├── QrMultiAdminController.cs.bak_20260109_203743
+│   ├── QrMultiAdminController.cs.bak_20260109_204328
+│   ├── SapChangeRequestsUdoController.cs.bak_20260214_182533
+│   ├── SapChangeRequestsUdoController.cs.bak_20260214_193343
+│   ├── SapChangeRequestsUdoController.cs.bak_20260213_210550
+│   ├── SapChangeRequestsUdoController.cs.bak_20260205_085448
+│   ├── SapChangeRequestsUdoController.cs.bak_20260205_090107
+│   ├── SAPLoginController.cs
+│   ├── SapSqlSchemaController.cs.bak_20260128_072550
+│   ├── UserWebController.cs
+│   ├── SapSetupController.cs.bak_20260127_112926
+│   ├── SapSetupController.cs
+│   ├── SapSetupController.cs.bak_20260127_072330
+│   ├── SapChangeRequestsUdoController.cs.bak_20260205_084411
+│   ├── SapChangeRequestsUdoController.cs
+│   ├── SapChangeRequestsUdoController.cs.bak_20260202_163752
+│   ├── SalesReturnsController.cs.backup_20260210_125545
+│   ├── SalesReturnsController.cs
+│   ├── SalesReturnsController.cs.backup_20260210_125451
+│   ├── SapChangeRequestsUdoController.cs.bak_20260202_164347
+│   ├── SapChangeRequestsUdoController.cs.bak_20260203_115942
+│   ├── SapChangeRequestsUdoController.cs.bak_20260203_120219
+│   ├── SapChangeRequestsUdoController.cs.bak_20260203_114856
+│   ├── SapChangeRequestsUdoController.cs.bak_20260202_165939
+│   ├── SapChangeRequestsUdoController.cs.bak_20260203_114832
+│   ├── QRController.Loxone.cs.bak_20260112_190551
+│   ├── DbSetupController.cs.bak_20260128_092223
+│   ├── DbSetupController.cs.bak_20260128_092535
+│   ├── DbSetupController.cs.bak_20260128_092158
+│   ├── DbSetupController.cs.bak_20260128_090617
+│   ├── DbSetupController.cs.bak_20260128_092127
+│   ├── DbSetupController.cs.bak_20260128_120133
+│   ├── ItemsController.cs
+│   ├── ItemsGroupsController.cs
+│   ├── GoodsReceiptController.cs
+│   ├── DocSignController.cs
+│   ├── ExpoController.cs
+│   ├── DbSetupController.cs.bak_20260128_085638
+│   ├── BusinessPartnersController.cs.bak_20260124_115529
+│   ├── ChangeRequestsController.cs
+│   ├── BusinessPartnersController.cs.bak_20260124_102927
+│   ├── BoyumEmailController.cs
+│   ├── BusinessPartnersController.cs
+│   ├── ChangeRequestsController.cs.bak_20260127_112926
+│   ├── DbSetupController.cs.bak_20260128_072550
+│   ├── DbSetupController.cs.bak_20260128_072634
+│   ├── DbSetupController.cs.bak_20260127_152225
+│   ├── CustomerPortfolioController.cs
+│   ├── DbSetupController.cs
+│   ├── QRController.Loxone.cs
+│   ├── QRController.Loxone.cs.bak_20260111_183404
+│   ├── QRController.Device.cs.bak_20260120_195137
+│   ├── QRController.Device.cs.bak_20260119_165903
+│   ├── QRController.Device.cs.bak_20260119_165937
+│   ├── QRController.Loxone.cs.bak_20260111_184031
+│   ├── QRController.Loxone.cs.bak_20260112_184753
+│   ├── QRController.Loxone.cs.bak_20260112_185732
+│   ├── QRController.Loxone.cs.bak_20260111_185502
+│   ├── QRController.Loxone.cs.bak_20260111_184214
+│   ├── QRController.Loxone.cs.bak_20260111_184405
+│   ├── QRController.Device.cs.bak_20260119_165548
+│   ├── MediaController.cs
+│   ├── OutletController.cs
+│   ├── MailQueueController.cs
+│   ├── LoginController.cs
+│   ├── LoginController.cs.bak_20260206_071846
+│   ├── QRController.cs
+│   ├── QRController.Device.cs
+│   ├── QRController.Device.cs.bak_20260119_152604
+│   ├── QRController.Device.Admin.cs
+│   ├── QRController.cs.bak_20260109_155520
+│   └── QRController.cs.bak_20260109_160048
+├── bin
+│   ├── Release
+│   │   └── net8.0
+│   │       ├── Querys
+│   │       │   ├── GetSalesOrdersSummary.sql
+│   │       │   ├── GetSalesOrdersDetail.sql
+│   │       │   ├── GetSalesReturnDetail.sql
+│   │       │   ├── GetTemporalGoodsReceipt.sql
+│   │       │   ├── GetSalesReturnsSummary.sql
+│   │       │   ├── GetSalesOffersSummary.sql
+│   │       │   ├── GetSalesDeliveryNotesSummary.sql
+│   │       │   ├── GetSalesDeliveryNoteDetail.sql
+│   │       │   ├── GetSalesInvoiceDetail.sql
+│   │       │   ├── GetSalesOfferDetail.sql
+│   │       │   ├── GetSalesInvoicesSummary.sql
+│   │       │   ├── SetupOperaris_GetDetail.sql
+│   │       │   ├── SetupOperaris_Create.sql
+│   │       │   ├── SetupOperaris_GetList.sql
+│   │       │   ├── SetupOperaris_Update.sql
+│   │       │   ├── SetupOperaris_SetActive.sql
+│   │       │   ├── SetupObres_UpdateOpenFields.sql
+│   │       │   ├── SetupObres_Create.sql
+│   │       │   ├── GetTreeItem.sql
+│   │       │   ├── SetupObres_GetDetail.sql
+│   │       │   ├── SetupObres_SetActive.sql
+│   │       │   ├── SetupObres_GetList.sql
+│   │       │   ├── GetItemsGroups.sql
+│   │       │   ├── GetItems.sql
+│   │       │   ├── GetItemsPurchasedSummary.sql
+│   │       │   ├── GetItemsSubGroups.sql
+│   │       │   ├── GetItemsSalesPrices.sql
+│   │       │   ├── GetItemPurchasedHistory.sql
+│   │       │   ├── GetBusinessPartnersWithOpenPurcharseOrders.sql
+│   │       │   ├── GetBusinessPartners.sql
+│   │       │   ├── GetClientProfile.sql
+│   │       │   ├── GetItem.sql
+│   │       │   ├── GetCustomerReceiptsSummary.sql
+│   │       │   ├── GetOutletItemsBySubGroup.sql
+│   │       │   ├── GetOutletItemImage.sql
+│   │       │   ├── GetOutletSubGroups.sql
+│   │       │   ├── GetProductTree.sql
+│   │       │   ├── GetOutletSubGroupsByGroup.sql
+│   │       │   ├── GetOutletItemByCode.sql
+│   │       │   ├── GetOpenPurcharseOrdersFromBP.sql
+│   │       │   ├── GetOpenPurcharseOrderFromBP.sql
+│   │       │   ├── GetOpenPurchaseOrder.sql
+│   │       │   ├── GetOutletGroups.sql
+│   │       │   └── GetOpenPurchaseOrders.sql
+│   │       ├── ru
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── pl
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── pt-BR
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── zh-Hans
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── zh-Hant
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── runtimes
+│   │       │   ├── osx-arm64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.dylib
+│   │       │   ├── osx-x64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.dylib
+│   │       │   ├── osx
+│   │       │   │   └── native
+│   │       │   │       └── libSkiaSharp.dylib
+│   │       │   ├── maccatalyst-arm64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.dylib
+│   │       │   ├── maccatalyst-x64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.dylib
+│   │       │   ├── unix
+│   │       │   │   └── lib
+│   │       │   │       └── net8.0
+│   │       │   │           └── Microsoft.Data.SqlClient.dll
+│   │       │   ├── win-x64
+│   │       │   │   └── native
+│   │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │   │       ├── libSkiaSharp.dll
+│   │       │   │       └── e_sqlite3.dll
+│   │       │   ├── win-x86
+│   │       │   │   └── native
+│   │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │   │       ├── libSkiaSharp.dll
+│   │       │   │       └── e_sqlite3.dll
+│   │       │   ├── win-arm64
+│   │       │   │   └── native
+│   │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │   │       ├── libSkiaSharp.dll
+│   │       │   │       └── e_sqlite3.dll
+│   │       │   ├── win
+│   │       │   │   └── lib
+│   │       │   │       └── net8.0
+│   │       │   │           ├── System.Runtime.Caching.dll
+│   │       │   │           ├── Microsoft.Win32.SystemEvents.dll
+│   │       │   │           └── Microsoft.Data.SqlClient.dll
+│   │       │   ├── win-arm
+│   │       │   │   └── native
+│   │       │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│   │       │   │       └── e_sqlite3.dll
+│   │       │   ├── linux-x86
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-armel
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-mips64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-arm64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── browser-wasm
+│   │       │   │   └── nativeassets
+│   │       │   │       └── net8.0
+│   │       │   │           └── e_sqlite3.a
+│   │       │   ├── linux-arm
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-musl-arm
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-s390x
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-x64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-ppc64le
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   ├── linux-musl-arm64
+│   │       │   │   └── native
+│   │       │   │       └── libe_sqlite3.so
+│   │       │   └── linux-musl-x64
+│   │       │       └── native
+│   │       │           └── libe_sqlite3.so
+│   │       ├── tr
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── de
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── es
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── App_Data
+│   │       │   └── qrloxone.db
+│   │       ├── cs
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── ja
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── ko
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── fr
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── it
+│   │       │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│   │       │   ├── Microsoft.Data.SqlClient.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.resources.dll
+│   │       │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│   │       │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│   │       ├── Swashbuckle.AspNetCore.SwaggerUI.dll
+│   │       ├── System.CodeDom.dll
+│   │       ├── Swashbuckle.AspNetCore.Swagger.dll
+│   │       ├── Swashbuckle.AspNetCore.SwaggerGen.dll
+│   │       ├── System.Composition.Hosting.dll
+│   │       ├── System.Composition.Runtime.dll
+│   │       ├── System.Composition.AttributedModel.dll
+│   │       ├── System.Composition.Convention.dll
+│   │       ├── Swashbuckle.AspNetCore.Filters.dll
+│   │       ├── Scrutor.dll
+│   │       ├── SkiaSharp.dll
+│   │       ├── Newtonsoft.Json.dll
+│   │       ├── QRCoder.dll
+│   │       ├── SQLitePCLRaw.provider.e_sqlite3.dll
+│   │       ├── Swashbuckle.AspNetCore.Filters.Abstractions.dll
+│   │       ├── SQLitePCLRaw.batteries_v2.dll
+│   │       ├── SQLitePCLRaw.core.dll
+│   │       ├── XNDmjApi.dll
+│   │       ├── XNDmjApi.exe
+│   │       ├── web.config
+│   │       ├── XNDmjApi.deps.json
+│   │       ├── XNDmjApi.staticwebassets.endpoints.json
+│   │       ├── XNDmjApi.staticwebassets.runtime.json
+│   │       ├── XNDmjApi.pdb
+│   │       ├── XNDmjApi.runtimeconfig.json
+│   │       ├── System.Security.Cryptography.ProtectedData.dll
+│   │       ├── System.Drawing.Common.dll
+│   │       ├── System.IdentityModel.Tokens.Jwt.dll
+│   │       ├── System.Composition.TypedParts.dll
+│   │       ├── System.Configuration.ConfigurationManager.dll
+│   │       ├── System.Private.Windows.GdiPlus.dll
+│   │       ├── System.Runtime.Caching.dll
+│   │       ├── System.Memory.Data.dll
+│   │       ├── System.Private.Windows.Core.dll
+│   │       ├── Microsoft.CodeAnalysis.CSharp.Workspaces.dll
+│   │       ├── Microsoft.CodeAnalysis.dll
+│   │       ├── Microsoft.Bcl.AsyncInterfaces.dll
+│   │       ├── Microsoft.CodeAnalysis.CSharp.dll
+│   │       ├── Microsoft.Data.Sqlite.dll
+│   │       ├── Microsoft.EntityFrameworkCore.Abstractions.dll
+│   │       ├── Microsoft.CodeAnalysis.Workspaces.dll
+│   │       ├── Microsoft.Data.SqlClient.dll
+│   │       ├── Microsoft.AspNetCore.Authentication.JwtBearer.dll
+│   │       ├── Azure.Core.dll
+│   │       ├── Azure.Identity.dll
+│   │       ├── appsettings.Development.json
+│   │       ├── appsettings.json
+│   │       ├── crq_update_lines.json
+│   │       ├── Humanizer.dll
+│   │       ├── body_update_lines.json
+│   │       ├── crq_create.json
+│   │       ├── Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+│   │       ├── Microsoft.IdentityModel.Tokens.dll
+│   │       ├── Microsoft.IdentityModel.Logging.dll
+│   │       ├── Microsoft.IdentityModel.Protocols.dll
+│   │       ├── Microsoft.Win32.SystemEvents.dll
+│   │       ├── Mono.TextTemplating.dll
+│   │       ├── Microsoft.OpenApi.dll
+│   │       ├── Microsoft.SqlServer.Server.dll
+│   │       ├── Microsoft.IdentityModel.JsonWebTokens.dll
+│   │       ├── Microsoft.EntityFrameworkCore.Relational.dll
+│   │       ├── Microsoft.EntityFrameworkCore.Sqlite.dll
+│   │       ├── Microsoft.EntityFrameworkCore.Design.dll
+│   │       ├── Microsoft.EntityFrameworkCore.dll
+│   │       ├── Microsoft.Identity.Client.Extensions.Msal.dll
+│   │       ├── Microsoft.IdentityModel.Abstractions.dll
+│   │       ├── Microsoft.Extensions.DependencyModel.dll
+│   │       └── Microsoft.Identity.Client.dll
+│   └── Debug
+│       └── net8.0
+│           ├── Querys
+│           │   ├── GetSalesOrdersSummary.sql
+│           │   ├── GetSalesOrdersDetail.sql
+│           │   ├── GetSalesReturnDetail.sql
+│           │   ├── GetTemporalGoodsReceipt.sql
+│           │   ├── GetSalesReturnsSummary.sql
+│           │   ├── GetSalesOffersSummary.sql
+│           │   ├── GetSalesDeliveryNotesSummary.sql
+│           │   ├── GetSalesDeliveryNoteDetail.sql
+│           │   ├── GetSalesInvoiceDetail.sql
+│           │   ├── GetSalesOfferDetail.sql
+│           │   ├── GetSalesInvoicesSummary.sql
+│           │   ├── SetupOperaris_GetDetail.sql
+│           │   ├── SetupOperaris_Create.sql
+│           │   ├── SetupOperaris_GetList.sql
+│           │   ├── SetupOperaris_Update.sql
+│           │   ├── SetupOperaris_SetActive.sql
+│           │   ├── SetupObres_UpdateOpenFields.sql
+│           │   ├── SetupObres_Create.sql
+│           │   ├── GetTreeItem.sql
+│           │   ├── SetupObres_GetDetail.sql
+│           │   ├── SetupObres_SetActive.sql
+│           │   ├── SetupObres_GetList.sql
+│           │   ├── GetItemsGroups.sql
+│           │   ├── GetItems.sql
+│           │   ├── GetItemsPurchasedSummary.sql
+│           │   ├── GetItemsSubGroups.sql
+│           │   ├── GetItemsSalesPrices.sql
+│           │   ├── GetItemPurchasedHistory.sql
+│           │   ├── GetBusinessPartnersWithOpenPurcharseOrders.sql
+│           │   ├── GetBusinessPartners.sql
+│           │   ├── GetClientProfile.sql
+│           │   ├── GetItem.sql
+│           │   ├── GetCustomerReceiptsSummary.sql
+│           │   ├── GetOutletItemsBySubGroup.sql
+│           │   ├── GetOutletItemImage.sql
+│           │   ├── GetOutletSubGroups.sql
+│           │   ├── GetProductTree.sql
+│           │   ├── GetOutletSubGroupsByGroup.sql
+│           │   ├── GetOutletItemByCode.sql
+│           │   ├── GetOpenPurcharseOrdersFromBP.sql
+│           │   ├── GetOpenPurcharseOrderFromBP.sql
+│           │   ├── GetOpenPurchaseOrder.sql
+│           │   ├── GetOutletGroups.sql
+│           │   └── GetOpenPurchaseOrders.sql
+│           ├── ru
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── pl
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── pt-BR
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── zh-Hans
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── zh-Hant
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── runtimes
+│           │   ├── osx-arm64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.dylib
+│           │   ├── osx-x64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.dylib
+│           │   ├── osx
+│           │   │   └── native
+│           │   │       └── libSkiaSharp.dylib
+│           │   ├── maccatalyst-arm64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.dylib
+│           │   ├── maccatalyst-x64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.dylib
+│           │   ├── unix
+│           │   │   └── lib
+│           │   │       └── net8.0
+│           │   │           └── Microsoft.Data.SqlClient.dll
+│           │   ├── win-x64
+│           │   │   └── native
+│           │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│           │   │       ├── libSkiaSharp.dll
+│           │   │       └── e_sqlite3.dll
+│           │   ├── win-x86
+│           │   │   └── native
+│           │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│           │   │       ├── libSkiaSharp.dll
+│           │   │       └── e_sqlite3.dll
+│           │   ├── win-arm64
+│           │   │   └── native
+│           │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│           │   │       ├── libSkiaSharp.dll
+│           │   │       └── e_sqlite3.dll
+│           │   ├── win
+│           │   │   └── lib
+│           │   │       └── net8.0
+│           │   │           ├── System.Runtime.Caching.dll
+│           │   │           ├── Microsoft.Win32.SystemEvents.dll
+│           │   │           └── Microsoft.Data.SqlClient.dll
+│           │   ├── win-arm
+│           │   │   └── native
+│           │   │       ├── Microsoft.Data.SqlClient.SNI.dll
+│           │   │       └── e_sqlite3.dll
+│           │   ├── linux-x86
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-armel
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-mips64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-arm64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── browser-wasm
+│           │   │   └── nativeassets
+│           │   │       └── net8.0
+│           │   │           └── e_sqlite3.a
+│           │   ├── linux-arm
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-musl-arm
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-s390x
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-x64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-ppc64le
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   ├── linux-musl-arm64
+│           │   │   └── native
+│           │   │       └── libe_sqlite3.so
+│           │   └── linux-musl-x64
+│           │       └── native
+│           │           └── libe_sqlite3.so
+│           ├── tr
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── de
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── es
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── App_Data
+│           │   └── qrloxone.db
+│           ├── cs
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── ja
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── ko
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── fr
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── it
+│           │   ├── Microsoft.CodeAnalysis.Workspaces.resources.dll
+│           │   ├── Microsoft.Data.SqlClient.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.resources.dll
+│           │   ├── Microsoft.CodeAnalysis.CSharp.resources.dll
+│           │   └── Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+│           ├── Swashbuckle.AspNetCore.SwaggerUI.dll
+│           ├── System.CodeDom.dll
+│           ├── Swashbuckle.AspNetCore.Swagger.dll
+│           ├── Swashbuckle.AspNetCore.SwaggerGen.dll
+│           ├── System.Composition.Hosting.dll
+│           ├── System.Composition.Runtime.dll
+│           ├── System.Composition.AttributedModel.dll
+│           ├── System.Composition.Convention.dll
+│           ├── Swashbuckle.AspNetCore.Filters.dll
+│           ├── Scrutor.dll
+│           ├── SkiaSharp.dll
+│           ├── Newtonsoft.Json.dll
+│           ├── QRCoder.dll
+│           ├── SQLitePCLRaw.provider.e_sqlite3.dll
+│           ├── Swashbuckle.AspNetCore.Filters.Abstractions.dll
+│           ├── SQLitePCLRaw.batteries_v2.dll
+│           ├── SQLitePCLRaw.core.dll
+│           ├── XNDmjApi.dll
+│           ├── XNDmjApi.exe
+│           ├── web.config
+│           ├── XNDmjApi.deps.json
+│           ├── XNDmjApi.staticwebassets.endpoints.json
+│           ├── XNDmjApi.staticwebassets.runtime.json
+│           ├── XNDmjApi.pdb
+│           ├── XNDmjApi.runtimeconfig.json
+│           ├── System.Security.Cryptography.ProtectedData.dll
+│           ├── System.Drawing.Common.dll
+│           ├── System.IdentityModel.Tokens.Jwt.dll
+│           ├── System.Composition.TypedParts.dll
+│           ├── System.Configuration.ConfigurationManager.dll
+│           ├── System.Private.Windows.GdiPlus.dll
+│           ├── System.Runtime.Caching.dll
+│           ├── System.Memory.Data.dll
+│           ├── System.Private.Windows.Core.dll
+│           ├── Microsoft.CodeAnalysis.CSharp.Workspaces.dll
+│           ├── Microsoft.CodeAnalysis.dll
+│           ├── Microsoft.Bcl.AsyncInterfaces.dll
+│           ├── Microsoft.CodeAnalysis.CSharp.dll
+│           ├── Microsoft.Data.Sqlite.dll
+│           ├── Microsoft.EntityFrameworkCore.Abstractions.dll
+│           ├── Microsoft.CodeAnalysis.Workspaces.dll
+│           ├── Microsoft.Data.SqlClient.dll
+│           ├── Microsoft.AspNetCore.Authentication.JwtBearer.dll
+│           ├── Azure.Core.dll
+│           ├── Azure.Identity.dll
+│           ├── appsettings.Development.json
+│           ├── appsettings.json
+│           ├── crq_update_lines.json
+│           ├── Humanizer.dll
+│           ├── body_update_lines.json
+│           ├── crq_create.json
+│           ├── Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+│           ├── Microsoft.IdentityModel.Tokens.dll
+│           ├── Microsoft.IdentityModel.Logging.dll
+│           ├── Microsoft.IdentityModel.Protocols.dll
+│           ├── Microsoft.Win32.SystemEvents.dll
+│           ├── Mono.TextTemplating.dll
+│           ├── Microsoft.OpenApi.dll
+│           ├── Microsoft.SqlServer.Server.dll
+│           ├── Microsoft.IdentityModel.JsonWebTokens.dll
+│           ├── Microsoft.EntityFrameworkCore.Relational.dll
+│           ├── Microsoft.EntityFrameworkCore.Sqlite.dll
+│           ├── Microsoft.EntityFrameworkCore.Design.dll
+│           ├── Microsoft.EntityFrameworkCore.dll
+│           ├── Microsoft.Identity.Client.Extensions.Msal.dll
+│           ├── Microsoft.IdentityModel.Abstractions.dll
+│           ├── Microsoft.Extensions.DependencyModel.dll
+│           └── Microsoft.Identity.Client.dll
+├── App_Data
+│   ├── qrloxone.db.bak_20260110_083354
+│   ├── qrloxone.db.bak_20260110_083612
+│   ├── qrloxone.db.bak_20260110_083303
+│   ├── qrloxone.db
+│   └── qrloxone.db.bak
+├── Functions
+│   ├── Login.cs
+│   ├── Login.cs.bak_20260206_071846
+│   ├── Encryption.cs
+│   ├── Funcions.cs
+│   ├── SAPBO.cs
+│   ├── SapUdtHelper.cs
+│   ├── MSSQL.cs
+│   ├── PurcharseOrders.cs
+│   ├── DataAccess.cs.bak_20260128_072634
+│   ├── Dades.cs.bak_20260121_145956
+│   ├── Dades.cs.bak_20260121_150227
+│   ├── Dades.cs
+│   ├── Dades.cs.bak_20260121_145839
+│   ├── DataAccess.cs
+│   ├── DataAccess.cs.bak_20260128_072550
+│   ├── Dades.cs.bak_20260128_072550
+│   └── Dades.cs.bak_20260128_072634
+├── Loxone
+│   ├── Options
+│   │   ├── TokenPolicyOptions.cs
+│   │   ├── LoxoneOptions.cs.bak_20260109_153310
+│   │   ├── TokenPolicyOptions.cs.bak_20260109_153310
+│   │   ├── TokenPolicyOptions.cs.bak_20260109_153243
+│   │   ├── LoxoneOptions.cs.bak_20260109_153243
+│   │   ├── AdminOptions.cs.bak_20260109_153243
+│   │   ├── AdminOptions.cs
+│   │   ├── LoxoneOptions.cs
+│   │   └── AdminOptions.cs.bak_20260109_153310
+│   ├── Services
+│   │   ├── TokenService.cs
+│   │   ├── TokenService.cs.bak_20260109_153243
+│   │   ├── TokenService.cs.bak_20260109_153310
+│   │   ├── LoxoneCommandService.cs
+│   │   ├── LoxoneCommandService.cs.bak_20260109_153243
+│   │   └── LoxoneCommandService.cs.bak_20260109_153310
+│   ├── Data
+│   │   ├── AppDbContext.cs.bak_20260109_203430
+│   │   ├── AppDbContext.cs.bak_20260119_152203
+│   │   ├── AppDbContext.cs.bak_20260109_153310
+│   │   ├── AppDbContext.cs
+│   │   └── AppDbContext.cs.bak_20260109_153243
+│   └── Models
+│       ├── LoxoneAction.cs.bak_20260109_153310
+│       ├── LoxoneAction.cs.bak_20260109_153243
+│       ├── LoxoneAction.cs
+│       ├── QrToken.cs.bak_20260109_153310
+│       ├── QrToken.cs.bak_20260109_153243
+│       ├── QrToken.cs
+│       ├── LocationAction.cs.bak_20260109_153310
+│       ├── Location.cs.bak_20260109_153310
+│       ├── Location.cs.bak_20260109_153243
+│       ├── Location.cs
+│       ├── LocationAction.cs.bak_20260109_153243
+│       ├── LocationAction.cs
+│       └── Location.cs.bak_20260111_183404
+├── logs
+├── Infrastructure
+│   ├── Options
+│   │   ├── DbMigrationsOptions.cs
+│   │   ├── ApiKeyProfilesOptions.cs.bak_20260202_150400
+│   │   └── ApiKeyProfilesOptions.cs
+│   ├── Services
+│   │   ├── DbMigrationRunner.cs.bak_20260119_152203
+│   │   └── DbMigrationRunner.cs
+│   ├── ApiKeys
+│   │   ├── ApiKeyProfileMiddleware.cs.bak_20260206_071226
+│   │   ├── ApiKeyProfilesOptions.cs
+│   │   ├── ApiKeyProfileMiddleware.cs.bak_20260205_151800
+│   │   ├── ApiKeyProfileMiddleware.cs
+│   │   └── ApiKeyProfileMiddleware.cs.backup_20260210_125545
+│   └── Middleware
+│       ├── ApiKeyProfilesMiddleware.cs.bak_20260202_150400
+│       ├── ApiKeyProfilesMiddleware.cs
+│       └── ApiExceptionJsonMiddleware.cs
+├── README.md
+├── Program.cs.bak_20260214_114500
+├── web.config.bak_20260111_095942
+├── web.config
+├── Program.cs.bak_20260202_202922
+├── Program.cs.bak_20260202_170752
+├── Program.cs.bak_20260202_210603
+├── Program.cs.bak_20260202_204550
+├── _dmjapi_curl.ps1
+├── xns_tree_export.ps1
+├── _dmj_export_api_code.ps1
+├── _dmjapi_script.ps1
+├── XNApiRest.sln
+├── XNApiRest.http
+├── XNDmjApi.csproj.user
+├── XNDmjApi.csproj
+├── dump_selectiu.ps1
+├── crq_update_lines.json
+├── dump_total.ps1
+├── dump_selectiu_2.ps1
+├── appsettings.json
+├── appsettings.Development.json
+├── crq_create.json
+├── body_update_lines.json
+├── Program.cs.bak_20260202_150343
+├── Program.cs.bak_20260128_072634
+├── Program.cs.bak_20260202_165939
+├── Program.cs.bak_20260202_150400
+├── Program.cs.backup_20260210_125545
+├── Program.cs
+├── Program.cs.bak_20260128_072550
+└── Program.cs.bak_20260127_153251

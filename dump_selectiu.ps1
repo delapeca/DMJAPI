@@ -12,15 +12,10 @@ $OutputFile = "E:\XNApiRest_dump_selectiu.txt"
 
 # Llista d'elements que vull EXPORTAR (rutes relatives COMPLETES o patrons)
 $IncludeItems = @(
-    "Controllers/DbSetupController.cs",
-    "Controllers/SapSqlSchemaController.cs",
-    "Services/SqlSchemaService.cs", 
-    "Models/SqlSchemaSpec.cs",
-    "Functions/Dades.cs",
-    "Services/SAPLoginService.cs",
-    "Functions/DataAccess.cs",
-    "Program.cs",
-    "appsettings*.json"
+    "Models\ChangeRequestsUdo\ChangeRequestUdoUpsertRequest.cs"
+    "Services\SapChangeRequestsUdoService.cs"
+    "Models\ChangeRequestsUdo\SapChangeRequestsUdoContracts.cs"
+
 )
 
 # Llista d'elements que NO vull EXPORTAR (rutes relatives o patrons)

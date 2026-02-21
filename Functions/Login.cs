@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Data.SqlClient;
 using Newtonsoft.Json;
 using System.Data;
@@ -143,6 +143,8 @@ namespace XNDmjApi.Functions
                 {
                     return false;
                 }
+
+        
                 string emailUsuario = this.GetEmailUserFromToken(userToken);
 
                 Encryption encrypt = new Encryption();
@@ -167,6 +169,115 @@ namespace XNDmjApi.Functions
             catch (Exception)
             {
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Reset de password via token (caducitat). Token format:
+        ///   AES256_USER_Key( "yyyyMMddHHmmss#email#encryptedNewPassword" )
+        /// on encryptedNewPassword = AES256_LOGIN_Key(password en clar)
+        /// Retorna: OK | TOKEN_EXPIRED | TOKEN_INVALID | USER_NOT_FOUND | DB_CONTEXT_MISSING | <error>
+        /// </summary>
+        public string ResetPasswordByToken(string resetToken)
+        {
+            try
+            {
+                // 0) Connexió DB (mateix patró que LoginByToken: assegurem DOMENJO_BBDD si cal)
+                if (string.IsNullOrEmpty(Dades.ConnectionStringDOMENJO))
+                {
+                    if (string.IsNullOrWhiteSpace(Dades.DOMENJO_BBDD))
+                        Dades.DOMENJO_BBDD = "SBO_DOMENJO";
+
+                    Dades.SetupDades();
+                }
+
+                if (string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                    return "DB_CONTEXT_MISSING";
+
+                if (string.IsNullOrWhiteSpace(resetToken))
+                    return "TOKEN_INVALID";
+
+                Encryption encrypt = new Encryption();
+
+                // normalitza URL encoding bàsic (/%2F/)
+                resetToken = encrypt.TokenModify(resetToken);
+
+                string decoded;
+                try
+                {
+                    decoded = encrypt.AES256_Decrypt(encrypt.AES256_USER_Key, resetToken);
+                }
+                catch
+                {
+                    return "TOKEN_INVALID";
+                }
+
+                // expected: expiry#email#encryptedNewPassword
+                var parts = decoded.Split('#');
+                if (parts.Length < 3)
+                    return "TOKEN_INVALID";
+
+                string expiryStr = parts[0]?.Trim() ?? "";
+                string email = parts[1]?.Trim() ?? "";
+                string encNewPwd = parts[2]?.Trim() ?? "";
+
+                if (string.IsNullOrWhiteSpace(expiryStr) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(encNewPwd))
+                    return "TOKEN_INVALID";
+
+                // caducitat (UTC)
+                DateTime expiryUtc;
+                if (!DateTime.TryParseExact(expiryStr, "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture,
+                                            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                                            out expiryUtc))
+                {
+                    return "TOKEN_INVALID";
+                }
+
+                if (DateTime.UtcNow > expiryUtc)
+                    return "TOKEN_EXPIRED";
+
+                // password en clar (venia xifrat amb AES256_LOGIN_Key)
+                encNewPwd = encrypt.TokenModify(encNewPwd);
+                string newPassword;
+                try
+                {
+                    newPassword = encrypt.AES256_Decrypt(encrypt.AES256_LOGIN_Key, encNewPwd);
+                }
+                catch
+                {
+                    return "TOKEN_INVALID";
+                }
+
+                if (string.IsNullOrWhiteSpace(newPassword))
+                    return "TOKEN_INVALID";
+
+                // update password (hash SHA2_256) a @XNUSERWEB
+                using (var con = new SqlConnection(Dades.ConnectionStringDOMENJO))
+                using (var cmd = con.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                    UPDATE [dbo].[@XNUSERWEB]
+                    SET U_Password = HASHBYTES('SHA2_256', @NewPassword)
+                    WHERE U_Email = @Email;
+                    ";
+                    cmd.Parameters.Add(new SqlParameter("@Email", SqlDbType.VarChar, 250) { Value = email });
+                    cmd.Parameters.Add(new SqlParameter("@NewPassword", SqlDbType.VarChar, 50) { Value = newPassword });
+
+                    con.Open();
+                    int rows = cmd.ExecuteNonQuery();
+                    if (rows == 1)
+                        return "OK";
+
+                    return "USER_NOT_FOUND";
+                }
+            }
+            catch (Exception ex)
+            {
+                // si DataAccess tira "DB_CONTEXT_MISSING" en altres llocs, mantenim coherència
+                if (ex.Message != null && ex.Message.Contains("DB_CONTEXT_MISSING"))
+                    return "DB_CONTEXT_MISSING";
+
+                return ex.Message ?? "RESET_FAILED";
             }
         }
 

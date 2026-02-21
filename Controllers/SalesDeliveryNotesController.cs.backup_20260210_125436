@@ -1,0 +1,84 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Globalization;
+using XNDmjApi.Services;
+
+namespace XNDmjApi.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class SalesDeliveryNotesController : ControllerBase
+    {
+        // billingStatus: NOT_INVOICED | INVOICED
+        [HttpPost("GetSalesDeliveryNotesSummary")]
+        public ActionResult GetSalesDeliveryNotesSummary([FromForm] string cardCode = "%",[FromForm] string year = "",[FromForm] string fromDate = "",[FromForm] string toDate = "",[FromForm] string billingStatus = "NOT_INVOICED")
+        {
+            try
+            {
+                DateTime from;
+                DateTime to;
+
+                if (!string.IsNullOrWhiteSpace(year))
+                {
+                    int y = int.Parse(year);
+                    from = new DateTime(y, 1, 1);
+                    to   = new DateTime(y, 12, 31);
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(fromDate) || string.IsNullOrWhiteSpace(toDate))
+                        return BadRequest("fromDate i toDate són obligatoris si no s'indica year.");
+
+                    from = DateTime.ParseExact(fromDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    to   = DateTime.ParseExact(toDate,   "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                }
+
+                var svc = new SalesDeliveryNotesService();
+                var jsonResult = svc.GetSalesDeliveryNotesSummary(cardCode, from, to, billingStatus);
+
+                return Content(jsonResult, "application/json");
+            }
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+           catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("GetSalesDeliveryNoteDetail")]
+        public ActionResult GetSalesDeliveryNoteDetail([FromForm] string cardCode = "%",[FromForm] int docEntry = 0)
+        {
+            try
+            {
+                var svc = new SalesDeliveryNotesService();
+                var jsonResult = svc.GetSalesDeliveryNoteDetail(cardCode, docEntry);
+
+                // Mateix patró que SalesOrders: string JSON retornat com a text
+                return Ok(jsonResult);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+ 
+   }
+}

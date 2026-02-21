@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
 using SAPbobsCOM;
 using System;
 using System.Runtime.InteropServices;
@@ -9,12 +10,12 @@ using XNDmjApi.Models.ChangeRequestsUdo;
 namespace XNDmjApi.Services
 {
     /// <summary>
-    /// Extranet: Create + UpdateLines (només si Status=PENDING)
-    /// Connexió DI-API amb usuari tècnic resolt per X-Api-Key (perfil), sense Dades.oCompany.
+    /// Extranet: Create + UpdateLines (nomÃ©s si Status=PENDING)
+    /// ConnexiÃ³ DI-API amb usuari tÃ¨cnic resolt per X-Api-Key (perfil), sense Dades.oCompany.
     /// </summary>
     public sealed class SapChangeRequestsUdoService
     {
-        // UDO/UDT names (sense @) — segons EnsureSchema (XN_CRQ + XN_CRQ1)
+        // UDO/UDT names (sense @) â€” segons EnsureSchema (XN_CRQ + XN_CRQ1)
         private const string UdoCode = "XN_CRQ";
         private const string LTable = "XN_CRQ1";
 
@@ -30,7 +31,18 @@ namespace XNDmjApi.Services
             string action = req.Action.Trim().ToLowerInvariant();
             if (action != "create" && action != "update") return (false, "INVALID_ACTION", "action ha de ser create/update.", null);
 
+            // IdempotÃ¨ncia: si ja existeix una CRQ PENDING equivalent, no en creem una de nova
+            {
+                var (found, existingRef, errCode, errMsg) = FindExistingPending(profile, req.CardCode.Trim(), req.Kind.Trim(), action, req.TargetId);
+                if (errCode != null)
+                    return (false, errCode, errMsg ?? "Error cercant pending.", null);
+
+                if (found && !string.IsNullOrWhiteSpace(existingRef))
+                    return (true, "OK_ALREADY_PENDING", "Ja existeix una peticiÃ³ PENDING equivalent. Es reutilitza.", existingRef);
+            }
+
             string requestRef = BuildRequestRef();
+
 
             Company? company = null;
             CompanyService? companyService = null;
@@ -165,12 +177,12 @@ namespace XNDmjApi.Services
                 try { status = (data.GetProperty("U_Status")?.ToString() ?? "").Trim(); } catch { }
 
                 if (!status.Equals("PENDING", StringComparison.OrdinalIgnoreCase))
-                    return (false, "NOT_PENDING", "No es pot modificar: l'estat no és PENDING.");
+                    return (false, "NOT_PENDING", "No es pot modificar: l'estat no Ã©s PENDING.");
 
-                // REGLA: extranet només pot tocar línies → substituïm totes les línies
+                // REGLA: extranet nomÃ©s pot tocar lÃ­nies â†’ substituÃ¯m totes les lÃ­nies
                 lines = data.Child(LTable);
 
-                // Buida col·lecció
+                // Buida colÂ·lecciÃ³
                 try
                 {
                     while (lines.Count > 0)
@@ -199,7 +211,7 @@ namespace XNDmjApi.Services
                 }
 
                 generalService.Update(data);
-                return (true, "OK", "Línies actualitzades (PENDING).");
+                return (true, "OK", "LÃ­nies actualitzades (PENDING).");
             }
             catch (Exception ex)
             {
@@ -224,128 +236,150 @@ namespace XNDmjApi.Services
                 catch { /* ignore */ }
             }
         }
-        public (bool ok, string code, string message, ChangeRequestListResponse? data) List(
-            ApiKeyProfile profile,
-            string cardCode,
-            string? kind,
-            int? targetId,
-            string? status,
-            int skip,
-            int top,
-            bool orderDesc)
+
+        public (bool ok, string code, string message, ChangeRequestListResponse? data) List(ApiKeyProfile profile, string cardCode, string? kind, int? targetId, string? status, int skip, int top, bool orderDesc)
         {
-            if (profile == null) return (false, "MISSING_PROFILE", "Falta perfil (X-Api-Key).", null);
+            if (profile == null) return (false, "MISSING_PROFILE", "Falta perfil (ProfileApiKey / X-Api-Key).", null);
             if (string.IsNullOrWhiteSpace(cardCode)) return (false, "MISSING_CARDCODE", "Falta cardCode.", null);
 
             if (skip < 0) skip = 0;
             if (top <= 0) top = 50;
             if (top > 200) top = 200;
 
-            Company? company = null;
-            Recordset? rs = null;
+            // IMPORTANT: ara NO fem DI-API. Llistat via SQL directe a la DB del perfil.
+            string db = (profile.CompanyDb ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(db))
+                return (false, "DB_CONTEXT_MISSING", "Falta CompanyDb al perfil (ApiKeyProfilesOptions).", null);
+
+            if (string.IsNullOrWhiteSpace(ApplicationSettings.MSSQL_SRV) ||
+                string.IsNullOrWhiteSpace(ApplicationSettings.MSSQL_USER) ||
+                string.IsNullOrWhiteSpace(ApplicationSettings.MSSQL_PWD))
+            {
+                return (false, "MSSQL_CONFIG_MISSING", "Falta config MSSQL (SRV/USER/PWD).", null);
+            }
+
+            string connStr =
+                $"Data Source={ApplicationSettings.MSSQL_SRV};" +
+                $"Initial Catalog={db};" +
+                $"User ID={ApplicationSettings.MSSQL_USER};" +
+                $"Password={ApplicationSettings.MSSQL_PWD};" +
+                $"TrustServerCertificate=True;";
+
+            string cc = cardCode.Trim();
+            string? kind2 = string.IsNullOrWhiteSpace(kind) ? null : kind.Trim();
+            string? status2 = string.IsNullOrWhiteSpace(status) ? null : status.Trim();
+
+            int from = skip + 1;
+            int to = skip + top;
+
+            string order = orderDesc ? "DESC" : "ASC";
+
+            // WHERE parametritzat (evitem injeccions)
+            var where = new System.Text.StringBuilder();
+            where.Append("T.U_CardCode = @cardCode");
+
+            if (!string.IsNullOrWhiteSpace(kind2))
+                where.Append(" AND T.U_Kind = @kind");
+
+            if (targetId.HasValue)
+                where.Append(" AND T.U_TargetId = @targetId");
+
+            if (!string.IsNullOrWhiteSpace(status2))
+                where.Append(" AND T.U_Status = @status");
+
+            string sql = $@"
+                SELECT
+                  U_RequestRef,
+                  U_CardCode,
+                  U_Kind,
+                  U_Action,
+                  U_TargetId,
+                  U_TargetName,
+                  U_Status,
+                  U_RequestedAtUtc,
+                  U_DecisionAtUtc,
+                  U_DecisionNote,
+                  U_ApplyAtUtc,
+                  U_ApplyError
+                FROM
+                (
+                    SELECT
+                      ROW_NUMBER() OVER (ORDER BY T.CreateDate {order}, T.CreateTime {order}, T.DocEntry {order}) AS RN,
+                      T.U_RequestRef,
+                      T.U_CardCode,
+                      T.U_Kind,
+                      T.U_Action,
+                      T.U_TargetId,
+                      T.U_TargetName,
+                      T.U_Status,
+                      T.U_RequestedAtUtc,
+                      T.U_DecisionAtUtc,
+                      T.U_DecisionNote,
+                      T.U_ApplyAtUtc,
+                      T.U_ApplyError
+                    FROM [@XN_CRQ] T
+                    WHERE {where}
+                ) X
+                WHERE X.RN BETWEEN @from AND @to
+                ORDER BY X.RN;";
 
             try
             {
-                var (okConn, err) = ConnectCompany(profile, out company);
-                if (!okConn || company == null)
-                    return (false, err ?? "SAP_CONNECT_FAILED", "No es pot connectar a SAP (DI-API) amb el perfil.", null);
-
-                string cc = cardCode.Trim().Replace("'", "''");
-                string? kind2 = string.IsNullOrWhiteSpace(kind) ? null : kind.Trim();
-                string? status2 = string.IsNullOrWhiteSpace(status) ? null : status.Trim();
-
-                string where = $"U_CardCode = '{cc}'";
-
-                if (!string.IsNullOrWhiteSpace(kind2))
-                    where += $" AND U_Kind = '{kind2.Replace("'", "''")}'";
-
-                if (targetId.HasValue)
-                    where += $" AND U_TargetId = {targetId.Value}";
-
-                if (!string.IsNullOrWhiteSpace(status2))
-                    where += $" AND U_Status = '{status2.Replace("'", "''")}'";
-
-                int from = skip + 1;
-                int to = skip + top;
-
-                string order = orderDesc ? "DESC" : "ASC";
-
-                string sql = $@"
-SELECT
-  U_RequestRef,
-  U_CardCode,
-  U_Kind,
-  U_Action,
-  U_TargetId,
-  U_TargetName,
-  U_Status,
-  U_RequestedAtUtc,
-  U_DecisionAtUtc,
-  U_DecisionNote,
-  U_ApplyAtUtc,
-  U_ApplyError
-FROM
-(
-    SELECT
-      ROW_NUMBER() OVER (ORDER BY T.CreateDate {order}, T.CreateTime {order}, T.DocEntry {order}) AS RN,
-      T.U_RequestRef,
-      T.U_CardCode,
-      T.U_Kind,
-      T.U_Action,
-      T.U_TargetId,
-      T.U_TargetName,
-      T.U_Status,
-      T.U_RequestedAtUtc,
-      T.U_DecisionAtUtc,
-      T.U_DecisionNote,
-      T.U_ApplyAtUtc,
-      T.U_ApplyError
-    FROM [@XN_CRQ] T
-    WHERE {where}
-) X
-WHERE X.RN BETWEEN {from} AND {to}
-ORDER BY X.RN";
-
-                rs = (Recordset)company.GetBusinessObject(BoObjectTypes.BoRecordset);
-                rs.DoQuery(sql);
-
                 var resp = new ChangeRequestListResponse
                 {
                     Ok = true,
                     Code = "OK",
                     Message = "OK",
-                    CardCode = cardCode.Trim()
+                    CardCode = cc,
+                    Items = new System.Collections.Generic.List<ChangeRequestListItemDto>(),
+                    Paging = null
                 };
 
+                using var con = new SqlConnection(connStr);
+                using var cmd = new SqlCommand(sql, con);
+
+                cmd.Parameters.AddWithValue("@cardCode", cc);
+                if (!string.IsNullOrWhiteSpace(kind2)) cmd.Parameters.AddWithValue("@kind", kind2!);
+                if (targetId.HasValue) cmd.Parameters.AddWithValue("@targetId", targetId.Value);
+                if (!string.IsNullOrWhiteSpace(status2)) cmd.Parameters.AddWithValue("@status", status2!);
+                cmd.Parameters.AddWithValue("@from", from);
+                cmd.Parameters.AddWithValue("@to", to);
+
+                con.Open();
+                using var r = cmd.ExecuteReader();
+
                 int count = 0;
-                while (!rs.EoF)
+
+                while (r.Read())
                 {
                     var item = new ChangeRequestListItemDto
                     {
-                        RequestRef = Convert.ToString(rs.Fields.Item("U_RequestRef").Value)?.Trim(),
-                        CardCode = Convert.ToString(rs.Fields.Item("U_CardCode").Value)?.Trim(),
-                        Kind = Convert.ToString(rs.Fields.Item("U_Kind").Value)?.Trim(),
-                        Action = Convert.ToString(rs.Fields.Item("U_Action").Value)?.Trim(),
-                        Status = Convert.ToString(rs.Fields.Item("U_Status").Value)?.Trim(),
-                        TargetName = Convert.ToString(rs.Fields.Item("U_TargetName").Value)?.Trim(),
-                        RequestedAtUtc = Convert.ToString(rs.Fields.Item("U_RequestedAtUtc").Value)?.Trim(),
-                        DecisionAtUtc = Convert.ToString(rs.Fields.Item("U_DecisionAtUtc").Value)?.Trim(),
-                        DecisionNote = Convert.ToString(rs.Fields.Item("U_DecisionNote").Value)?.Trim(),
-                        ApplyAtUtc = Convert.ToString(rs.Fields.Item("U_ApplyAtUtc").Value)?.Trim(),
-                        ApplyError = Convert.ToString(rs.Fields.Item("U_ApplyError").Value)?.Trim(),
+                        RequestRef = (r["U_RequestRef"] as string)?.Trim(),
+                        CardCode = (r["U_CardCode"] as string)?.Trim(),
+                        Kind = (r["U_Kind"] as string)?.Trim(),
+                        Action = (r["U_Action"] as string)?.Trim(),
+                        Status = (r["U_Status"] as string)?.Trim(),
+                        TargetName = (r["U_TargetName"] as string)?.Trim(),
+                        RequestedAtUtc = (r["U_RequestedAtUtc"] as string)?.Trim(),
+                        DecisionAtUtc = (r["U_DecisionAtUtc"] as string)?.Trim(),
+                        DecisionNote = (r["U_DecisionNote"] as string)?.Trim(),
+                        ApplyAtUtc = (r["U_ApplyAtUtc"] as string)?.Trim(),
+                        ApplyError = (r["U_ApplyError"] as string)?.Trim(),
                     };
 
                     try
                     {
-                        var v = rs.Fields.Item("U_TargetId").Value;
-                        int tid=0;
-                        if (v != null && int.TryParse(Convert.ToString(v), out tid)) item.TargetId = tid;
+                        // U_TargetId pot venir null o numÃ¨ric
+                        if (r["U_TargetId"] != null && r["U_TargetId"] != System.DBNull.Value)
+                        {
+                            if (int.TryParse(System.Convert.ToString(r["U_TargetId"]), out int tid))
+                                item.TargetId = tid;
+                        }
                     }
-                    catch { }
+                    catch { /* ignore */ }
 
                     resp.Items.Add(item);
                     count++;
-                    rs.MoveNext();
                 }
 
                 resp.Paging = new ChangeRequestPagingDto
@@ -358,23 +392,9 @@ ORDER BY X.RN";
 
                 return (true, "OK", "OK", resp);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 return (false, "EXCEPTION", ex.Message, null);
-            }
-            finally
-            {
-                if (rs != null) Marshal.ReleaseComObject(rs);
-
-                try
-                {
-                    if (company != null)
-                    {
-                        if (company.Connected) company.Disconnect();
-                        Marshal.ReleaseComObject(company);
-                    }
-                }
-                catch { }
             }
         }
 
@@ -396,27 +416,27 @@ ORDER BY X.RN";
                 string rr = requestRef.Trim().Replace("'", "''");
 
                 string sqlH = $@"
-SELECT TOP 1
-  Code,
-  U_RequestRef,
-  U_CardCode,
-  U_Kind,
-  U_Action,
-  U_TargetId,
-  U_TargetName,
-  U_TargetJson,
-  U_Reason,
-  U_RequestedByUserId,
-  U_RequestedByEmail,
-  U_Status,
-  U_RequestedAtUtc,
-  U_DecisionAtUtc,
-  U_DecisionNote,
-  U_ApplyAtUtc,
-  U_ApplyError
-FROM [@XN_CRQ]
-WHERE Code = '{rr}' OR U_RequestRef = '{rr}'
-ORDER BY DocEntry DESC";
+                    SELECT TOP 1
+                      Code,
+                      U_RequestRef,
+                      U_CardCode,
+                      U_Kind,
+                      U_Action,
+                      U_TargetId,
+                      U_TargetName,
+                      U_TargetJson,
+                      U_Reason,
+                      U_RequestedByUserId,
+                      U_RequestedByEmail,
+                      U_Status,
+                      U_RequestedAtUtc,
+                      U_DecisionAtUtc,
+                      U_DecisionNote,
+                      U_ApplyAtUtc,
+                      U_ApplyError
+                    FROM [@XN_CRQ]
+                    WHERE Code = '{rr}' OR U_RequestRef = '{rr}'
+                    ORDER BY DocEntry DESC";
 
                 rsH = (Recordset)company.GetBusinessObject(BoObjectTypes.BoRecordset);
                 rsH.DoQuery(sqlH);
@@ -448,7 +468,7 @@ ORDER BY DocEntry DESC";
                 try
                 {
                     var v = rsH.Fields.Item("U_TargetId").Value;
-                    int tid=0;
+                    int tid = 0;
                     if (v != null && int.TryParse(Convert.ToString(v), out tid)) item.TargetId = tid;
                 }
                 catch { }
@@ -456,13 +476,14 @@ ORDER BY DocEntry DESC";
                 try
                 {
                     var v = rsH.Fields.Item("U_RequestedByUserId").Value;
-                    int uid=0;
+                    int uid = 0;
                     if (v != null && int.TryParse(Convert.ToString(v), out uid)) item.RequestedByUserId = uid;
                 }
                 catch { }
 
                 string sqlL = $@"
                     SELECT
+                      LineId,
                       U_Entity,
                       U_Field,
                       U_OldValue,
@@ -473,6 +494,7 @@ ORDER BY DocEntry DESC";
                     FROM [@XN_CRQ1]
                     WHERE Code = '{codeSql}'
                     ORDER BY LineId ASC";
+
 
                 rsL = (Recordset)company.GetBusinessObject(BoObjectTypes.BoRecordset);
                 rsL.DoQuery(sqlL);
@@ -491,6 +513,8 @@ ORDER BY DocEntry DESC";
                         IsSensitive = bSens,
                         LineStatus = Convert.ToString(rsL.Fields.Item("U_LineStatus").Value)?.Trim(),
                         LineError = Convert.ToString(rsL.Fields.Item("U_LineError").Value),
+                        LineId = Convert.ToInt32(rsL.Fields.Item("LineId").Value),
+
                     });
 
                     rsL.MoveNext();
@@ -527,7 +551,193 @@ ORDER BY DocEntry DESC";
             }
         }
 
+        public (bool ok, string code, string message) SetLineStatus(ApiKeyProfile profile, string cardCode, string code, int lineId, string lineStatus)
+        {
+            if (profile == null) return (false, "MISSING_PROFILE", "Falta perfil (ProfileApiKey / X-Api-Key).");
+            if (string.IsNullOrWhiteSpace(cardCode)) return (false, "MISSING_CARDCODE", "Falta cardCode.");
+            if (string.IsNullOrWhiteSpace(code)) return (false, "MISSING_CODE", "Falta code.");
+            if (lineId < 0) return (false, "INVALID_LINEID", "lineId invÃ lid.");
 
+            string st = (lineStatus ?? "").Trim().ToUpperInvariant();
+            if (st != "VALIDATED" && st != "REJECTED")
+                return (false, "INVALID_STATUS", "lineStatus ha de ser VALIDATED o REJECTED.");
+
+            Company? company = null;
+            CompanyService? companyService = null;
+            GeneralService? generalService = null;
+            GeneralDataParams? key = null;
+            GeneralData? data = null;
+            GeneralDataCollection? lines = null;
+
+            try
+            {
+                var (okConn, err) = ConnectCompany(profile, out company);
+                if (!okConn || company == null)
+                    return (false, err ?? "SAP_CONNECT_FAILED", "No es pot connectar a SAP (DI-API) amb el perfil.");
+
+                companyService = company.GetCompanyService();
+                generalService = companyService.GetGeneralService(UdoCode);
+
+                key = (GeneralDataParams)generalService.GetDataInterface(GeneralServiceDataInterfaces.gsGeneralDataParams);
+                key.SetProperty("Code", code.Trim());
+
+                data = generalService.GetByParams(key);
+
+                // Validate CardCode matches the request owner
+                string cc = "";
+                try { cc = (data.GetProperty("U_CardCode")?.ToString() ?? "").Trim(); } catch { }
+                if (!cc.Equals(cardCode.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return (false, "NOT_FOUND", "No existeix CRQ amb aquest cardCode + code.");
+
+                lines = data.Child(LTable);
+
+                bool found = false;
+
+                // Find the line by SAP child table LineId (system field)
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    var ln = lines.Item(i);
+
+                    int currentLineId = -1;
+
+                    try
+                    {
+                        var v = ln.GetProperty("LineId");
+                        int lid = 0;
+                        if (v != null && int.TryParse(Convert.ToString(v), out lid))
+                            currentLineId = lid;
+                    }
+                    catch { /* ignore */ }
+
+                    if (currentLineId == lineId)
+                    {
+                        ln.SetProperty("U_LineStatus", st);
+                        found = true;
+                        break;
+                    }
+                }
+
+                // ------------------------------------------------------
+                // Recalcular estat de capÃ§alera segons estat de lÃ­nies
+                // Regla:
+                //   - VALIDATED si NO queda cap PENDING (poden existir REJECTED)
+                //   - PENDING si existeix qualsevol PENDING
+                // ------------------------------------------------------
+                bool hasPending = false;
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    var ln = lines.Item(i);
+                    string lst = "";
+                    try { lst = (ln.GetProperty("U_LineStatus")?.ToString() ?? "").Trim().ToUpperInvariant(); }
+                    catch { }
+
+                    if (lst == "PENDING")
+                    {
+                        hasPending = true;
+                        break;
+                    }
+                }
+
+                if (hasPending)
+                    data.SetProperty("U_Status", "PENDING");
+                else
+                    data.SetProperty("U_Status", "VALIDATED");
+
+
+                generalService.Update(data);
+                return (true, "OK", "LineStatus actualitzat.");
+            }
+            catch (Exception ex)
+            {
+                return (false, "EXCEPTION", ex.Message);
+            }
+            finally
+            {
+                if (lines != null) Marshal.ReleaseComObject(lines);
+                if (data != null) Marshal.ReleaseComObject(data);
+                if (key != null) Marshal.ReleaseComObject(key);
+                if (generalService != null) Marshal.ReleaseComObject(generalService);
+                if (companyService != null) Marshal.ReleaseComObject(companyService);
+
+                try
+                {
+                    if (company != null)
+                    {
+                        if (company.Connected) company.Disconnect();
+                        Marshal.ReleaseComObject(company);
+                    }
+                }
+                catch { /* ignore */ }
+            }
+        }
+
+        private static (bool found, string? requestRef, string? errCode, string? errMsg) FindExistingPending(ApiKeyProfile profile, string cardCode, string kind, string action, int? targetId)
+        {
+            // Mateixa validaciÃ³ de context que List()
+            string db = (profile.CompanyDb ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(db))
+                return (false, null, "DB_CONTEXT_MISSING", "Falta CompanyDb al perfil (ApiKeyProfilesOptions).");
+
+            if (string.IsNullOrWhiteSpace(ApplicationSettings.MSSQL_SRV) ||
+                string.IsNullOrWhiteSpace(ApplicationSettings.MSSQL_USER) ||
+                string.IsNullOrWhiteSpace(ApplicationSettings.MSSQL_PWD))
+            {
+                return (false, null, "MSSQL_CONFIG_MISSING", "Falta config MSSQL (SRV/USER/PWD).");
+            }
+
+            string connStr =
+                $"Data Source={ApplicationSettings.MSSQL_SRV};" +
+                $"Initial Catalog={db};" +
+                $"User ID={ApplicationSettings.MSSQL_USER};" +
+                $"Password={ApplicationSettings.MSSQL_PWD};" +
+                $"TrustServerCertificate=True;";
+
+            // Busquem la CRQ mÃ©s recent (DocEntry desc) que coincideixi amb el â€œscopeâ€ i sigui PENDING
+            // Retornem U_RequestRef (equivalent al Code perquÃ¨ tu el seteges igual)
+            string sql = @"
+                SELECT TOP 1
+                  ISNULL(NULLIF(LTRIM(RTRIM(T.U_RequestRef)), ''), T.Code) AS RequestRef
+                FROM [@XN_CRQ] T
+                WHERE
+                  T.U_Status = 'PENDING'
+                  AND T.U_CardCode = @cardCode
+                  AND T.U_Kind = @kind
+                  AND T.U_Action = @action
+                  AND (
+                        (@targetIdIsNull = 1 AND (T.U_TargetId IS NULL))
+                        OR
+                        (@targetIdIsNull = 0 AND T.U_TargetId = @targetId)
+                      )
+                ORDER BY T.DocEntry DESC;";
+
+            try
+            {
+                using var con = new SqlConnection(connStr);
+                using var cmd = new SqlCommand(sql, con);
+
+                cmd.Parameters.AddWithValue("@cardCode", cardCode);
+                cmd.Parameters.AddWithValue("@kind", kind);
+                cmd.Parameters.AddWithValue("@action", action);
+
+                int isNull = targetId.HasValue ? 0 : 1;
+                cmd.Parameters.AddWithValue("@targetIdIsNull", isNull);
+                cmd.Parameters.AddWithValue("@targetId", targetId.HasValue ? targetId.Value : 0);
+
+                con.Open();
+                var o = cmd.ExecuteScalar();
+                string? rr = (o == null || o == DBNull.Value) ? null : Convert.ToString(o)?.Trim();
+
+                if (string.IsNullOrWhiteSpace(rr))
+                    return (false, null, null, null);
+
+                return (true, rr, null, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, null, "EXCEPTION", ex.Message);
+            }
+        }
 
         private static (bool ok, string? err) ConnectCompany(ApiKeyProfile profile, out Company? company)
         {
@@ -587,7 +797,7 @@ ORDER BY DocEntry DESC";
                     return (false, "MISSING_REQUESTREF", "Falta requestRef.", null);
 
                 if (lines == null || lines.Count == 0)
-                    return (false, "MISSING_LINES", "Falten línies.", requestRef);
+                    return (false, "MISSING_LINES", "Falten lÃ­nies.", requestRef);
 
                 // Resolve DocEntry via RequestRef
                 int docEntry = 0;
@@ -611,7 +821,7 @@ ORDER BY DocEntry DESC";
 
                 string status = Convert.ToString(data.GetProperty("U_Status"))?.Trim().ToUpperInvariant() ?? "";
                 if (status != "PENDING")
-                    return (false, "NOT_PENDING", "Només es pot modificar si està PENDING.", requestRef);
+                    return (false, "NOT_PENDING", "NomÃ©s es pot modificar si estÃ  PENDING.", requestRef);
 
                 // Replace lines
                 var child = data.Child("XN_CRQ1");
@@ -633,15 +843,185 @@ ORDER BY DocEntry DESC";
                 }
 
                 generalService.Update(data);
-                return (true, "OK", "Línies actualitzades (PENDING).", requestRef);
+                return (true, "OK", "LÃ­nies actualitzades (PENDING).", requestRef);
             }
             catch (Exception ex)
             {
                 return (false, "EXCEPTION", ex.Message, requestRef);
             }
         }
+
+
+        // ============================================================
+        // APPLY (ProfileApiKey version)
+        //   - Només permet Apply si capçalera U_Status=VALIDATED
+        //   - Escriu resultat a la capçalera:
+        //       * APPLIED => U_ApplyAtUtc informat i U_ApplyError buit
+        //       * ERROR   => U_ApplyAtUtc buit i U_ApplyError amb missatge
+        //   - Escriu resultat per línia a U_LineError (si cal)
+        // ============================================================
+        public (bool ok, string code, string message) Apply(ApiKeyProfile profile, string requestRef, string? cardCode)
+        {
+            if (profile == null) return (false, "MISSING_PROFILE", "Falta perfil.");
+            if (string.IsNullOrWhiteSpace(requestRef)) return (false, "MISSING_REQUESTREF", "Falta requestRef.");
+
+            Company? company = null;
+            CompanyService? companyService = null;
+            GeneralService? generalService = null;
+            GeneralDataParams? key = null;
+            GeneralData? data = null;
+            GeneralDataCollection? lines = null;
+            BusinessPartners? bp = null;
+
+            try
+            {
+                var (okConn, err) = ConnectCompany(profile, out company);
+                if (!okConn || company == null)
+                    return (false, err ?? "SAP_CONNECT_FAILED", "No es pot connectar a SAP.");
+
+                companyService = company.GetCompanyService();
+                generalService = companyService.GetGeneralService(UdoCode);
+
+                key = (GeneralDataParams)generalService.GetDataInterface(GeneralServiceDataInterfaces.gsGeneralDataParams);
+                key.SetProperty("Code", requestRef.Trim());
+
+                data = generalService.GetByParams(key);
+
+                // 1) Només Apply si la capçalera està VALIDATED
+                string status = (data.GetProperty("U_Status")?.ToString() ?? "").Trim();
+                if (!status.Equals("VALIDATED", System.StringComparison.OrdinalIgnoreCase))
+                    return (false, "NOT_VALIDATED", "El CRQ no està VALIDATED.");
+
+                // 2) CardCode (seguretat): si ens passen cardCode, ha de coincidir amb el CRQ
+                string cc = (data.GetProperty("U_CardCode")?.ToString() ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(cardCode))
+                {
+                    string ccParam = (cardCode ?? "").Trim();
+                    if (!cc.Equals(ccParam, System.StringComparison.OrdinalIgnoreCase))
+                        return (false, "NOT_FOUND", "No existeix CRQ amb aquest cardCode + requestRef.");
+                }
+
+                // 3) Preparem BP 1 cop
+                bp = (BusinessPartners)company.GetBusinessObject(BoObjectTypes.oBusinessPartners);
+                if (!bp.GetByKey(cc))
+                    return (false, "BP_NOT_FOUND", "No existeix BusinessPartner.");
+
+                // 4) Recorrem línies VALIDATED i provem d'aplicar-les una a una
+                lines = data.Child(LTable);
+
+                var errors = new System.Collections.Generic.List<string>();
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    var ln = lines.Item(i);
+
+                    string ls = (ln.GetProperty("U_LineStatus")?.ToString() ?? "").Trim();
+                    if (!ls.Equals("VALIDATED", System.StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string field = (ln.GetProperty("U_Field")?.ToString() ?? "").Trim();
+                    string newVal = (ln.GetProperty("U_NewValue")?.ToString() ?? "").Trim();
+
+                    // netegem error de línia abans de provar
+                    try { ln.SetProperty("U_LineError", ""); } catch { }
+
+                    // Map de camps permesos (extranet)
+                    bool supported =
+                        field.Equals("phone_mobile", System.StringComparison.OrdinalIgnoreCase) ||
+                        field.Equals("phone_fixed", System.StringComparison.OrdinalIgnoreCase) ||
+                        field.Equals("email", System.StringComparison.OrdinalIgnoreCase);
+
+                    if (!supported)
+                    {
+                        string msg = $"FIELD_NOT_SUPPORTED: {field}";
+                        errors.Add(msg);
+                        try { ln.SetProperty("U_LineError", msg); } catch { }
+                        continue;
+                    }
+
+                    // Apliquem el valor al BP
+                    if (field.Equals("phone_mobile", System.StringComparison.OrdinalIgnoreCase))
+                        bp.Cellular = newVal;
+
+                    if (field.Equals("phone_fixed", System.StringComparison.OrdinalIgnoreCase))
+                        bp.Phone1 = newVal;
+
+                    if (field.Equals("email", System.StringComparison.OrdinalIgnoreCase))
+                        bp.EmailAddress = newVal;
+
+                    // Persistim a SAP (per línia) per poder registrar errors per línia
+                    int rc = bp.Update();
+                    if (rc != 0)
+                    {
+                        company.GetLastError(out int errCode, out string errMsg);
+                        string msg = $"SAP_{errCode}: {(errMsg ?? "Error SAP.")}";
+                        errors.Add(msg);
+                        try { ln.SetProperty("U_LineError", msg); } catch { }
+                        continue;
+                    }
+
+                    // OK: línia aplicada (U_LineError ja està buit)
+                }
+
+                // 5) Resultat capçalera: APPLIED / ERROR (via U_ApplyAtUtc + U_ApplyError)
+                if (errors.Count == 0)
+                {
+                    data.SetProperty("U_ApplyAtUtc", System.DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+                    data.SetProperty("U_ApplyError", "");
+                    generalService.Update(data);
+                    return (true, "OK_APPLIED", "Apply executat correctament (APPLIED).");
+                }
+                else
+                {
+                    // ERROR: guardem un resum a capçalera
+                    string errSummary = string.Join(" | ", errors);
+                    data.SetProperty("U_ApplyAtUtc", "");
+                    data.SetProperty("U_ApplyError", errSummary);
+                    generalService.Update(data);
+
+                    return (false, "APPLY_ERROR", "Apply amb errors. Revisa U_ApplyError i U_LineError.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                // Si peta per excepció, intentem deixar traça mínima si tenim data
+                try
+                {
+                    if (data != null && generalService != null)
+                    {
+                        data.SetProperty("U_ApplyAtUtc", "");
+                        data.SetProperty("U_ApplyError", ex.Message ?? "EXCEPTION");
+                        generalService.Update(data);
+                    }
+                }
+                catch { /* ignore */ }
+
+                return (false, "EXCEPTION", ex.Message);
+            }
+            finally
+            {
+                if (bp != null) Marshal.ReleaseComObject(bp);
+                if (lines != null) Marshal.ReleaseComObject(lines);
+                if (data != null) Marshal.ReleaseComObject(data);
+                if (key != null) Marshal.ReleaseComObject(key);
+                if (generalService != null) Marshal.ReleaseComObject(generalService);
+                if (companyService != null) Marshal.ReleaseComObject(companyService);
+
+                if (company != null)
+                {
+                    try
+                    {
+                        if (company.Connected) company.Disconnect();
+                        Marshal.ReleaseComObject(company);
+                    }
+                    catch { /* ignore */ }
+                }
+            }
+        }
+
     }
 }
+
 
 
 

@@ -60,8 +60,30 @@ namespace XNDmjApi.Services
                 return Convert.ToString(row[col]) ?? string.Empty;
             }
 
+            //return new ClientProfileDto
+            //{
+            //    CardCode = ReadStr("CardCode"),
+            //    CardName = ReadStr("CardName"),
+            //    Nif = ReadStr("Nif"),
+
+            //    GroupCode = ReadInt("GroupCode"),
+            //    GroupName = ReadStr("GroupName"),
+
+            //    PaymentGroupCode = ReadInt("PaymentGroupCode"),
+            //    PaymentGroupName = ReadStr("PaymentGroupName"),
+
+            //    Email = ReadStr("Email"),
+            //    Phone = ReadStr("Phone"),
+            //    Mobile = ReadStr("Mobile"),
+
+            //    BalanceAccount = ReadDec("BalanceAccount"),
+            //    BalanceOrders = ReadDec("BalanceOrders"),
+            //    BalanceDeliveries = ReadDec("BalanceDeliveries")
+            //};
+
             return new ClientProfileDto
             {
+                DBNAME = ReadStr("DatabaseName"),
                 CardCode = ReadStr("CardCode"),
                 CardName = ReadStr("CardName"),
                 Nif = ReadStr("Nif"),
@@ -76,9 +98,28 @@ namespace XNDmjApi.Services
                 Phone = ReadStr("Phone"),
                 Mobile = ReadStr("Mobile"),
 
+                // Método de pago por defecto
+                PayMethCod = ReadStr("PayMethCod"),
+                PayMethName = ReadStr("PayMethName"),
+
+                // Límites y saldos
+                CreditLine = ReadDec("CreditLine"),
                 BalanceAccount = ReadDec("BalanceAccount"),
                 BalanceOrders = ReadDec("BalanceOrders"),
-                BalanceDeliveries = ReadDec("BalanceDeliveries")
+                BalanceDeliveries = ReadDec("BalanceDeliveries"),
+
+                // IVA
+                VatStatus = ReadStr("VatStatus"),
+                ECVatGroup = ReadStr("ECVatGroup"),
+
+                // Dirección fiscal por defecto (Bill-to)
+                BillStreet = ReadStr("BillStreet"),
+                BillBlock = ReadStr("BillBlock"),
+                BillZipCode = ReadStr("BillZipCode"),
+                BillCity = ReadStr("BillCity"),
+                BillCountry = ReadStr("BillCountry"),
+                BillState = ReadStr("BillState"),
+                BillAddressName = ReadStr("BillAddressName")
             };
         }
     }

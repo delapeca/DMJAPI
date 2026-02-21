@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using SAPbobsCOM;
 using System.Globalization;
 using XNDmjApi.Functions;
+using XNDmjApi.Infrastructure.ApiKeys;
 using XNDmjApi.Models;
 using XNDmjApi.Services;
 
@@ -20,6 +21,9 @@ namespace XNDmjApi.Controllers
         [HttpPost("GetItems")]
         public ActionResult GetItems([FromForm]string itemCode="%", [FromForm] string itemName = "%", [FromForm] string itmsGrpCod = "%", [FromForm] string validFor = "Y")
         {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             //Clases.Log.LogWrite($"SetPassword: token={token}, encriptedOldPassword={encriptedOldPassword}, encriptedNewPassword={encriptedNewPassword}");
             ItemsService SItems = new ItemsService();
             string jsonResult = SItems.GetItem(itemCode, itemName, itmsGrpCod, validFor);
@@ -40,6 +44,9 @@ namespace XNDmjApi.Controllers
         [HttpPost("GetItemsSales")]
         public ActionResult GetItemsSales([FromForm] string cardCode = "%",[FromForm] string itemCode = "%", [FromForm] string itemName = "%",[FromForm] string itmsGrpCod = "%" )
         {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             ItemsService SItems = new ItemsService();
 
             // Fem servir el nou mètode GetItemSales (no canviem la ruta HTTP)
@@ -70,6 +77,9 @@ namespace XNDmjApi.Controllers
         [HttpPost("GetItemsPurchasedSummary")]
         public ActionResult GetItemsPurchasedSummary([FromForm] string cardCode,[FromForm] string year = "",[FromForm] string fromDate = "",[FromForm] string toDate = "")
         {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             if (string.IsNullOrWhiteSpace(cardCode))
             {
                 return BadRequest("Falta el CardCode.");
@@ -140,6 +150,9 @@ namespace XNDmjApi.Controllers
         [HttpPost("GetItemPurchasedHistory")]
         public ActionResult GetItemPurchasedHistory([FromForm] string cardCode,[FromForm] string itemCode,[FromForm] string year = "",[FromForm] string fromDate = "",[FromForm] string toDate = "")
         {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             if (string.IsNullOrWhiteSpace(cardCode))
             {
                 return BadRequest("Falta el CardCode.");
@@ -204,6 +217,10 @@ namespace XNDmjApi.Controllers
         [HttpPost("GetItemMediaInfo")]
         public ActionResult GetItemMediaInfo([FromForm] string itemCode)
         {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+
             if (string.IsNullOrWhiteSpace(itemCode))
             {
                 return BadRequest("Falta el camp obligatori itemCode.");
@@ -246,11 +263,15 @@ namespace XNDmjApi.Controllers
         [HttpPost("ProcessItemMedia")]
         public ActionResult ProcessItemMedia([FromForm] ProcessItemMediaRequest request)
         {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+
             // 🧪 En aquesta fase només fem wiring al servei de negoci.
             //     - No fem validacions fortes encara.
             //     - No toquem NAS ni DI-API.
             //     - Només retornem l'estructura de resposta “stub”.
-            
+
             if (!ModelState.IsValid)
             {
                 // Aquí podries escriure a log tots els errors i valors:
@@ -288,6 +309,10 @@ namespace XNDmjApi.Controllers
         [HttpGet("GetItemMediaThumbnail")]
         public IActionResult GetItemMediaThumbnail([FromQuery] string itemCode)
         {
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
+
             if (string.IsNullOrWhiteSpace(itemCode))
             {
                 return BadRequest("Falta el camp obligatori itemCode.");
@@ -313,6 +338,70 @@ namespace XNDmjApi.Controllers
 
             // Retornem la imatge com a JPEG perquè el navegador la pugui mostrar directament
             return File(thumbBytes, "image/jpeg");
+        }
+
+        // =====================================================================
+        // Helper central: Perfil + Selecció de BD (mateix patró que ClientsSelf)
+        // ---------------------------------------------------------------------
+        // Ús a cada endpoint d'Items:
+        // var fail = RequireProfileAndSelectDb(out var profile);
+        // if (fail != null) return fail;
+        //
+        // Depèn de:
+        // - ApiKeyProfileMiddleware (middleware) resol el perfil i el posa a:
+        // HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey]
+        // - ApiKeyProfile.CompanyDb és el selector de DB (PROD/TEST)
+        //
+        // IMPORTANT: Dades.* és estàtic/global → risc en concurrència amb perfils diferents.
+        // NO es toca ara: només repliquem el patró existent.
+        // =====================================================================
+        private ActionResult? RequireProfileAndSelectDb(out ApiKeyProfile? profile)
+        {
+            // 1) Recupera perfil resolt pel middleware
+            profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+            {
+                return Unauthorized(new
+                {
+                    ok = false,
+                    code = "MISSING_PROFILE",
+                    message = "Falta perfil (ProfileApiKey o X-Api-Key)."
+                });
+            }
+            // 2) CompanyDb és el “selector” de la BD
+            var db = (profile.CompanyDb ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(db))
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_CONTEXT_MISSING",
+                    message = "El perfil no porta CompanyDb."
+                });
+            }
+            // 3) Inicialitza / canvia DB context abans de cridar serveis SQL
+            try
+            {
+                // Recalcula només si cal:
+                // - si canvia el DB
+                // - o si encara no tenim ConnectionStringDOMENJO
+                if (!string.Equals(Dades.DOMENJO_BBDD ?? "", db, StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = db;
+                    Dades.SetupDades();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_SELECT_FAILED",
+                    message = ex.Message
+                });
+            }
+            return null; // OK
         }
 
     }

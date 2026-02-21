@@ -1,12 +1,12 @@
-declare @ItemCode as nvarchar(50);
-declare @ItemName as nvarchar(100);
-declare @ItmsGrpCod as int;
-declare @ValidFor as int;
+--declare @ItemCode as nvarchar(50);
+--declare @ItemName as nvarchar(100);
+--declare @ItmsGrpCod as int;
+--declare @ValidFor as int;
 
-set @ItemCode = N'%';
-set @ItemName = N'%';
-set @ItmsGrpCod = N'%';
-set @ValidFor = N'Y';
+--set @ItemCode = N'%';
+--set @ItemName = N'%';
+--set @ItmsGrpCod = N'%';
+--set @ValidFor = N'Y';
 
 select 
 T0.ItemCode

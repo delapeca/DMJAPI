@@ -1,22 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Globalization;
 using XNDmjApi.Services;
-using XNDmjApi.Infrastructure.ApiKeys;
-using XNDmjApi.Functions;  // ?? AFEGIT per ProfileApiKey
+using XNDmjApi.Infrastructure.ApiKeys;  // ?? AFEGIT per ProfileApiKey
 
 namespace XNDmjApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class SalesCreditNotesController : ControllerBase
+    public class SalesDeliveryNotesController : ControllerBase
     {
-        [HttpPost("GetSalesCreditNotesSummary")]
-        public ActionResult GetSalesCreditNotesSummary(
-            [FromForm] string cardCode = "%",
-            [FromForm] string year = "",
-            [FromForm] string fromDate = "",
-            [FromForm] string toDate = ""
-        )
+        // billingStatus: NOT_INVOICED | INVOICED
+        [HttpPost("GetSalesDeliveryNotesSummary")]
+        public ActionResult GetSalesDeliveryNotesSummary([FromForm] string cardCode = "%",[FromForm] string year = "",[FromForm] string fromDate = "",[FromForm] string toDate = "",[FromForm] string billingStatus = "NOT_INVOICED")
         {
             // ?? AFEGIT: Validació de perfil i selecció de BD
             var fail = RequireProfileAndSelectDb(out var profile);
@@ -24,23 +20,56 @@ namespace XNDmjApi.Controllers
 
             try
             {
-                var svc = new SalesCreditNotesService();
-                var jsonResult = svc.GetSalesCreditNotesSummary(cardCode, year, fromDate, toDate);
+                DateTime from;
+                DateTime to;
 
-                // Mateix patró que a la resta: el servei ja retorna JSON serialitzat
+                if (!string.IsNullOrWhiteSpace(year))
+                {
+                    int y = int.Parse(year);
+                    from = new DateTime(y, 1, 1);
+                    to   = new DateTime(y, 12, 31);
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(fromDate) || string.IsNullOrWhiteSpace(toDate))
+                        return BadRequest("fromDate i toDate són obligatoris si no s'indica year.");
+
+                    from = DateTime.ParseExact(fromDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    to   = DateTime.ParseExact(toDate,   "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                }
+
+                var svc = new SalesDeliveryNotesService();
+                var jsonResult = svc.GetSalesDeliveryNotesSummary(cardCode, from, to, billingStatus);
+
                 return Content(jsonResult, "application/json");
             }
-            catch (Exception ex)
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+           catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
             }
         }
 
-        [HttpPost("GetSalesCreditNoteDetail")]
-        public ActionResult GetSalesCreditNoteDetail(
-            [FromForm] string cardCode,
-            [FromForm] int docEntry
-        )
+        [HttpPost("GetSalesDeliveryNoteDetail")]
+        public ActionResult GetSalesDeliveryNoteDetail([FromForm] string cardCode = "%",[FromForm] int docEntry = 0)
         {
             // ?? AFEGIT: Validació de perfil i selecció de BD
             var fail = RequireProfileAndSelectDb(out var profile);
@@ -48,17 +77,19 @@ namespace XNDmjApi.Controllers
 
             try
             {
-                var svc = new SalesCreditNotesService();
-                var jsonResult = svc.GetSalesCreditNoteDetail(cardCode, docEntry);
+                var svc = new SalesDeliveryNotesService();
+                var jsonResult = svc.GetSalesDeliveryNoteDetail(cardCode, docEntry);
 
-                return Content(jsonResult, "application/json");
+                // Mateix patró que SalesOrders: string JSON retornat com a text
+                return Ok(jsonResult);
             }
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
             }
         }
-
+ 
+   }
 
         // =====================================================================
         // Helper central: Perfil + Selecció de BD (mateix patró que ItemsController)
@@ -126,6 +157,4 @@ namespace XNDmjApi.Controllers
 
             return null; // OK
         }
-    }
 }
-

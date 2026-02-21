@@ -17,6 +17,29 @@ namespace XNDmjApi.Models.DbSetup
     {
         [Required]
         public List<DbTableSpec> Tables { get; set; } = new();
+
+        /// <summary>
+        /// Opcional: UDOs a crear/assegurar (idempotent).
+        /// HeaderTable i ChildTables han d'existir dins Tables.
+        /// </summary>
+        public List<DbUdoSpec> Udos { get; set; } = new();
+    }
+
+    public sealed class DbUdoSpec
+    {
+        /// <summary>Codi del UDO (recomanat: igual que HeaderTable)</summary>
+        [Required]
+        public string Code { get; set; } = string.Empty;
+
+        /// <summary>Nom descriptiu del UDO</summary>
+        public string? Name { get; set; } = null;
+
+        /// <summary>Taula header (sense '@')</summary>
+        [Required]
+        public string HeaderTable { get; set; } = string.Empty;
+
+        /// <summary>Taules child (sense '@')</summary>
+        public List<string> ChildTables { get; set; } = new();
     }
 
     public sealed class DbTableSpec
@@ -25,17 +48,17 @@ namespace XNDmjApi.Models.DbSetup
         [Required]
         public string Name { get; set; } = string.Empty;
 
-        /// <summary>Opcional. Si vols forçar schema (per defecte: dbo)</summary>
+        /// <summary>Opcional. Si vols forçar schema (per defecte: dbo). (Ignorat en mode UDT/UDO)</summary>
         public string? Schema { get; set; } = null;
 
         /// <summary>Columnes</summary>
         [Required]
         public List<DbColumnSpec> Columns { get; set; } = new();
 
-        /// <summary>Clau primària (llista de columnes). Si no s'informa, no es crea PK</summary>
+        /// <summary>Clau primària (llista de columnes). (Ignorat en mode UDT/UDO)</summary>
         public List<string>? PrimaryKey { get; set; } = null;
 
-        /// <summary>Índexos (opc.)</summary>
+        /// <summary>Índexos (opc.) (Ignorat en mode UDT/UDO)</summary>
         public List<DbIndexSpec>? Indexes { get; set; } = null;
     }
 
@@ -45,19 +68,17 @@ namespace XNDmjApi.Models.DbSetup
         [Required]
         public string Name { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Tipus SQL allowlist (ex: int, bigint, bit, datetime2, uniqueidentifier, nvarchar(50), nvarchar(max), decimal(18,2), varbinary(max))
-        /// </summary>
+        /// <summary>Tipus SQL allowlist (ex: int, nvarchar(50), nvarchar(max), datetime2...)</summary>
         [Required]
         public string SqlType { get; set; } = string.Empty;
 
         /// <summary>Nullable? (default: true)</summary>
         public bool Nullable { get; set; } = true;
 
-        /// <summary>IDENTITY(1,1) (només aplicable a int/bigint)</summary>
+        /// <summary>IDENTITY(1,1) (Ignorat en mode UDT/UDO)</summary>
         public bool Identity { get; set; } = false;
 
-        /// <summary>Default SQL expression (ex: GETUTCDATE()) - opcional</summary>
+        /// <summary>Default SQL expression (Ignorat en mode UDT/UDO)</summary>
         public string? Default { get; set; } = null;
     }
 

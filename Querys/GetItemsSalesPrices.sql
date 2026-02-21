@@ -94,11 +94,17 @@ SELECT
     U1.UomEntry           AS UomEntry,          -- Identificador intern de la UM
     U1.BaseQty            AS BaseQty,           -- Quantitat base (revisa nom exacte a UGP1)
     U1.AltQty             AS AltQty,            -- Quantitat alternativa (idem)
+
+    -- 🔹 Ruta de les imatges de l'article, miniatura(Thumb) i alta resolució (HiRes)
+    T0.U_XN_Thumb,
+    T0.U_XN_HiRes,
+
     CASE 
         WHEN U1.UomEntry = T0.SUoMEntry THEN 'Y'
         ELSE 'N'
     END                   AS IsDefaultSalesUom  -- Indica si és la UM de venda per defecte
 
+    
 FROM OITM T0
     -- Grup d’articles
     INNER JOIN OITB T1
@@ -135,6 +141,8 @@ FROM OITM T0
     LEFT JOIN OUOM TInv
         ON TInv.UomEntry = T0.IUoMEntry
 
+
+
     --------------------------------------------------------
     -- Descompte segons Grup de client i grup d’articles
     --------------------------------------------------------
@@ -153,4 +161,5 @@ FROM OITM T0
 WHERE T0.ItemCode LIKE @ItemCode
   AND T0.ItemName LIKE @ItemName
   AND T0.ValidFor = 'Y'      -- Només articles amb la fitxa oberta (actius)
+  AND T0.U_BOY_TB_0 = 'N'
 ORDER BY T0.ItemName;

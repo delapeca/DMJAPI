@@ -1,7 +1,9 @@
-Ôªøusing Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Globalization;
 using XNDmjApi.Services;
+using XNDmjApi.Infrastructure.ApiKeys;
+using XNDmjApi.Functions;  // ?? AFEGIT per ProfileApiKey
 
 namespace XNDmjApi.Controllers
 {
@@ -13,32 +15,36 @@ namespace XNDmjApi.Controllers
         /// Resum de factures de venda per un client (CardCode).
         ///
         /// Accepta:
-        ///   - year = "2024" (opcional) ‚Üí si est√† informat, es fa servir l'any complet
-        ///   - fromDate / toDate (yyyy-MM-dd) ‚Üí si no hi ha year, s'ha d'informar rang de dates
-        ///   - status ‚Üí filtre de DocStatus (p.ex. "O", "C", "%"‚Ä¶)
-        ///   - docNum / numAtCard ‚Üí filtres opcionals per n√∫mero de document i refer√®ncia client
+        ///   - year = "2024" (opcional) ? si est‡ informat, es fa servir l'any complet
+        ///   - fromDate / toDate (yyyy-MM-dd) ? si no hi ha year, s'ha d'informar rang de dates
+        ///   - status ? filtre de DocStatus (p.ex. "O", "C", "%"Ö)
+        ///   - docNum / numAtCard ? filtres opcionals per n˙mero de document i referËncia client
         ///
         /// Endpoint:
         ///   POST api/SalesInvoices/GetSalesInvoicesSummary
         /// </summary>
         [HttpPost("GetSalesInvoicesSummary")]
         public ActionResult GetSalesInvoicesSummary(
-    [FromForm] string cardCode = "%",
-    [FromForm] string year = "",
-    [FromForm] string fromDate = "",
-    [FromForm] string toDate = "",
-    [FromForm] string status = "%",      // de moment NO l'usem a la query
-    [FromForm] string docNum = "",
-    [FromForm] string numAtCard = ""
-)
+            [FromForm] string cardCode = "%",
+            [FromForm] string year = "",
+            [FromForm] string fromDate = "",
+            [FromForm] string toDate = "",
+            [FromForm] string status = "%",      // de moment NO l'usem a la query
+            [FromForm] string docNum = "",
+            [FromForm] string numAtCard = ""
+            )
         {
+            // ?? AFEGIT: ValidaciÛ de perfil i selecciÛ de BD
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             try
             {
-                // 1Ô∏è‚É£ Normalitzar CardCode
+                // 1?? Normalitzar CardCode
                 if (string.IsNullOrWhiteSpace(cardCode))
                     cardCode = "%";
 
-                // 2Ô∏è‚É£ Resoluci√≥ de dates: any complet o from/to
+                // 2?? ResoluciÛ de dates: any complet o from/to
                 DateTime from;
                 DateTime to;
 
@@ -46,7 +52,7 @@ namespace XNDmjApi.Controllers
                 {
                     if (!int.TryParse(year, out int y))
                     {
-                        return BadRequest("El par√†metre 'year' no √©s un enter v√†lid.");
+                        return BadRequest("El par‡metre 'year' no Ès un enter v‡lid.");
                     }
 
                     from = new DateTime(y, 1, 1);
@@ -55,13 +61,13 @@ namespace XNDmjApi.Controllers
                 else
                 {
                     if (string.IsNullOrWhiteSpace(fromDate) || string.IsNullOrWhiteSpace(toDate))
-                        return BadRequest("fromDate i toDate s√≥n obligatoris si no s'indica year.");
+                        return BadRequest("fromDate i toDate sÛn obligatoris si no s'indica year.");
 
                     from = DateTime.ParseExact(fromDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
                     to = DateTime.ParseExact(toDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
                 }
 
-                // 3Ô∏è‚É£ Cridar el servei (sense status, nom√©s 5 par√†metres)
+                // 3?? Cridar el servei (sense status, nomÈs 5 par‡metres)
                 var svc = new SalesInvoicesService();
 
                 string jsonResult = svc.GetSalesInvoicesSummary(
@@ -85,14 +91,14 @@ namespace XNDmjApi.Controllers
 
 
         /// <summary>
-        /// Detall d'una factura de venda concreta (cap√ßalera + l√≠nies).
+        /// Detall d'una factura de venda concreta (capÁalera + lÌnies).
         ///
         /// Endpoint:
         ///   POST api/SalesInvoices/GetSalesInvoiceDetail
         ///
         /// Body (x-www-form-urlencoded / form-data):
-        ///   - cardCode  ‚Üí Codi client (per coher√®ncia amb la resta de m√≤duls)
-        ///   - docEntry  ‚Üí DocEntry de la factura (OINV.DocEntry)
+        ///   - cardCode  ? Codi client (per coherËncia amb la resta de mÚduls)
+        ///   - docEntry  ? DocEntry de la factura (OINV.DocEntry)
         /// </summary>
         [HttpPost("GetSalesInvoiceDetail")]
         public ActionResult GetSalesInvoiceDetail(
@@ -100,17 +106,89 @@ namespace XNDmjApi.Controllers
             [FromForm] int docEntry
         )
         {
+            // ?? AFEGIT: ValidaciÛ de perfil i selecciÛ de BD
+            var fail = RequireProfileAndSelectDb(out var profile);
+            if (fail != null) return fail;
+
             if (string.IsNullOrWhiteSpace(cardCode))
                 return BadRequest("Falta cardCode.");
 
             if (docEntry <= 0)
-                return BadRequest("docEntry inv√†lid.");
+                return BadRequest("docEntry inv‡lid.");
 
             var svc = new SalesInvoicesService();
             string jsonResult = svc.GetSalesInvoiceDetail(cardCode, docEntry);
 
-            // Seguint el patr√≥ de SalesOrdersController / SalesReturnsController
+            // Seguint el patrÛ de SalesOrdersController / SalesReturnsController
             return Ok(jsonResult);
+        }
+
+
+        // =====================================================================
+        // Helper central: Perfil + SelecciÛ de BD (mateix patrÛ que ItemsController)
+        // ---------------------------------------------------------------------
+        // ⁄s a cada endpoint:
+        // var fail = RequireProfileAndSelectDb(out var profile);
+        // if (fail != null) return fail;
+        //
+        // DepËn de:
+        // - ApiKeyProfileMiddleware (middleware) resol el perfil i el posa a:
+        //   HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey]
+        // - ApiKeyProfile.CompanyDb Ès el selector de DB (PROD/TEST)
+        //
+        // IMPORTANT: Dades.* Ès est‡tic/global ? risc en concurrËncia amb perfils diferents.
+        // NO es toca ara: nomÈs repliquem el patrÛ existent.
+        // =====================================================================
+        private ActionResult? RequireProfileAndSelectDb(out ApiKeyProfile? profile)
+        {
+            // 1) Recupera perfil resolt pel middleware
+            profile = HttpContext.Items[ApiKeyProfileMiddleware.HttpContextItemKey] as ApiKeyProfile;
+            if (profile == null)
+            {
+                return Unauthorized(new
+                {
+                    ok = false,
+                    code = "MISSING_PROFILE",
+                    message = "Falta perfil (ProfileApiKey o X-Api-Key)."
+                });
+            }
+
+            // 2) CompanyDb Ès el "selector" de la BD
+            var db = (profile.CompanyDb ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(db))
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_CONTEXT_MISSING",
+                    message = "El perfil no porta CompanyDb."
+                });
+            }
+
+            // 3) Inicialitza / canvia DB context abans de cridar serveis SQL
+            try
+            {
+                // Recalcula nomÈs si cal:
+                // - si canvia el DB
+                // - o si encara no tenim ConnectionStringDOMENJO
+                if (!string.Equals(Dades.DOMENJO_BBDD ?? "", db, StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(Dades.ConnectionStringDOMENJO))
+                {
+                    Dades.DOMENJO_BBDD = db;
+                    Dades.SetupDades();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    ok = false,
+                    code = "DB_SELECT_FAILED",
+                    message = ex.Message
+                });
+            }
+
+            return null; // OK
         }
     }
 }

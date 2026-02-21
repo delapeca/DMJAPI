@@ -10,9 +10,9 @@
 -- El descompte actual ve d'EDG1 (igual que a GetItemsSalesPrices.sql)
 ------------------------------------------------------------
 
---DECLARE @CardCode NVARCHAR(15) = 'C033754';
---DECLARE @FromDate DATE = '2024-01-01';
---DECLARE @ToDate   DATE = '2024-12-31';
+--DECLARE @CardCode NVARCHAR(15) = 'C009005';
+--DECLARE @FromDate DATE = '2026-01-01';
+--DECLARE @ToDate   DATE = '2026-12-31';
 
 ------------------------------------------------------------
 -- Obtenir el codi de grup de client (BPGroupCod)
@@ -48,14 +48,19 @@ SELECT
 
     I.ItemCode,
     I.ItemName,
+    
+    --H.U_XN_Obra,
+    --H.U_XN_DescObra,
+    --H.U_XN_Operari,
+    --H.U_XN_NomOperari,
 
     SUM(L.Quantity)    AS TotalQuantity,
 
     ISNULL(P.Price, 0)                            AS CurrentPrice,
     ISNULL(T8.Discount, 0)                        AS CurrentDiscount,
     ISNULL(P.Price, 0) * (1 - ISNULL(T8.Discount,0) / 100.0) AS CurrentNetPrice
-FROM OINV H
-INNER JOIN INV1 L  ON L.DocEntry = H.DocEntry
+FROM ODLN H
+INNER JOIN DLN1 L  ON L.DocEntry = H.DocEntry
 INNER JOIN OITM I  ON I.ItemCode = L.ItemCode
 INNER JOIN OITB G  ON G.ItmsGrpCod = I.ItmsGrpCod
 INNER JOIN OCRD C  ON C.CardCode   = H.CardCode
@@ -91,6 +96,10 @@ GROUP BY
     I.ItemName,
     P.Price,
     T8.Discount
+    --H.U_XN_Obra,
+    --H.U_XN_DescObra,
+    --H.U_XN_Operari,
+    --H.U_XN_NomOperari
 ORDER BY
     G.ItmsGrpNam,
     I.ItemName;

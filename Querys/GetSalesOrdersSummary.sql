@@ -36,6 +36,12 @@ SELECT
     H.DocCur,
     H.U_XN_Sign,
     H.DocStatus,
+
+    H.U_XN_Obra,
+    H.U_XN_DescObra,
+    H.U_XN_Operari,
+    H.U_XN_NomOperari,
+
     ISNULL(H.CANCELED, 'N') AS Canceled,
 
     -- Traduïm l'estat tècnic (DocStatus + CANCELED) a text d'usuari
